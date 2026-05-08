@@ -1,0 +1,14 @@
+export default function PageHeader({ title, subtitle, className = "" }) {
+  return (
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">{title}</h1>
+          {subtitle ? (
+            <p className="text-base font-medium text-zinc-400 mt-1 max-w-2xl">{subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}

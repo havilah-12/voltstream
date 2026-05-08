@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700;800&family=Orbitron:wght@500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  font-family: 'Nunito Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+  --volt-yellow: #eab308;
+  --volt-yellow-soft: rgba(234, 179, 8, 0.16);
+  --volt-yellow-border: rgba(234, 179, 8, 0.32);
+  --volt-yellow-glow: rgba(234, 179, 8, 0.22);
+}
+
+body {
+  font-family: 'Nunito Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: #000000;
+  color: var(--volt-yellow);
+  line-height: 1.6;
+  font-size: 17px;
+  font-weight: 500;
+  font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Orbitron', 'Nunito Sans', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+select option {
+  background: #17130a;
+  color: #f8fafc;
+}
+
+select option:checked {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.95), rgba(234, 179, 8, 0.55));
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+select option:hover,
+select option:focus {
+  background: rgba(234, 179, 8, 0.72);
+  color: #0a0a0a;
+}
+
+.font-display {
+  font-family: 'Orbitron', 'Nunito Sans', system-ui, sans-serif;
+}
+
+.app-shell {
+  width: min(1760px, calc(100vw - 64px));
+  margin-inline: auto;
+}
+
+.metric-icon {
+  transform-origin: center;
+  will-change: transform, box-shadow;
+}
+
+.metric-icon-grid {
+  animation: grid-pulse 1.9s ease-in-out infinite;
+}
+
+.metric-icon-solar {
+  animation: solar-glow 4.8s linear infinite;
+}
+
+.metric-icon-surplus {
+  animation: surplus-beat 1.55s ease-in-out infinite;
+}
+
+.metric-icon-solar svg {
+  animation: solar-spin 7s linear infinite;
+}
+
+.energy-wave .recharts-area-curve {
+  stroke-linecap: round;
+  stroke-dasharray: 16 18;
+  animation: wave-line-flow 2.2s linear infinite;
+}
+
+.energy-wave-grid .recharts-area-curve {
+  filter: drop-shadow(0 0 7px rgba(139, 92, 246, 0.55));
+}
+
+.energy-wave-solar .recharts-area-curve {
+  filter: drop-shadow(0 0 7px rgba(249, 115, 22, 0.6));
+  animation-delay: -0.8s;
+}
+
+.energy-wave .recharts-area-dot,
+.energy-wave .recharts-active-dot {
+  animation: wave-point-pulse 1.45s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-surface:focus,
+.recharts-surface:focus-visible {
+  outline: 2px solid var(--volt-yellow);
+  outline-offset: 2px;
+}
+
+@keyframes wave-line-flow {
+  to {
+    stroke-dashoffset: -68;
+  }
+}
+
+@keyframes wave-point-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+
+  50% {
+    transform: scale(1.28);
+    opacity: 1;
+  }
+}
+
+@keyframes grid-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.38);
+  }
+
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 12px rgba(168, 85, 247, 0);
+  }
+}
+
+@keyframes solar-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(249, 115, 22, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 26px rgba(249, 115, 22, 0.42);
+  }
+}
+
+@keyframes solar-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes surplus-beat {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0);
+  }
+
+  35% {
+    transform: scale(1.1);
+    box-shadow: 0 0 26px rgba(34, 197, 94, 0.34);
+  }
+
+  62% {
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-icon,
+  .metric-icon svg,
+  .energy-wave .recharts-area-curve,
+  .energy-wave .recharts-area-dot,
+  .energy-wave .recharts-active-dot {
+    animation: none;
+  }
+}
