@@ -19,7 +19,7 @@ class DevicePayload(BaseModel):
 def get_devices():
     return mock_db["devices"]
 
-@router.post("/")
+@router.post("/", include_in_schema=False)
 def create_device(device: DevicePayload):
     slug = device.type.lower().replace(" ", "-")
     new_device = device.model_dump()
@@ -35,7 +35,7 @@ def update_device_status(id: str, update: DeviceStatusUpdate):
             return device
     raise HTTPException(status_code=404, detail="Device not found")
 
-@router.put("/{id}")
+@router.put("/{id}", include_in_schema=False)
 def update_device(id: str, update: DevicePayload):
     for index, device in enumerate(mock_db["devices"]):
         if device["id"] == id:
@@ -45,7 +45,7 @@ def update_device(id: str, update: DevicePayload):
             return updated
     raise HTTPException(status_code=404, detail="Device not found")
 
-@router.delete("/{id}")
+@router.delete("/{id}", include_in_schema=False)
 def delete_device(id: str):
     for index, device in enumerate(mock_db["devices"]):
         if device["id"] == id:

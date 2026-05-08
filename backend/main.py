@@ -34,7 +34,7 @@ app.include_router(billing.router, prefix="/api/v1/billing")
 
 static_dir = Path(__file__).parent / "static"
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def root():
     index_file = static_dir / "index.html"
     if index_file.exists():
