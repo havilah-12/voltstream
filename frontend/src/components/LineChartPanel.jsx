@@ -58,7 +58,7 @@ export default function LineChartPanel({ data, title = "Today's Energy Flow", su
         {hasData ? (
           <>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 18 }}>
                 <defs>
                   <linearGradient id="gridGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={THEME_COLORS.gridGradientStart} stopOpacity={0.8} />
@@ -71,7 +71,14 @@ export default function LineChartPanel({ data, title = "Today's Energy Flow", su
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
                 <XAxis dataKey="label" ticks={hourlyTicks} axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#a1a1aa', fontSize: 12 }} dx={-10} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#a1a1aa', fontSize: 12 }}
+                  tickFormatter={(value) => `${value} kW`}
+                  width={54}
+                  dx={-6}
+                />
                 <Tooltip content={<EnergyTooltip />} />
                 <Legend content={<EnergyLegend />} />
                 <Area
