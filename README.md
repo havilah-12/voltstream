@@ -6,23 +6,38 @@ VoltStream is a full-stack energy monitoring dashboard with a React/Vite fronten
 
 - Frontend: React, Vite, React Router, Recharts, Tailwind CSS, Lucide icons
 - Backend: FastAPI, Uvicorn, Pydantic
-- Runtime: Docker Compose
+- Local runtime: Docker Compose
+- Deployment: Firebase Hosting for frontend, Cloud Run for backend
 
 ## Project Structure
 
 ```text
 voltstream/
 |-- backend/
+|   |-- Dockerfile
 |   |-- main.py
 |   |-- mock_data.py
 |   |-- requirements.txt
 |   `-- routers/
 |-- frontend/
+|   |-- firebase.json
 |   |-- src/
 |   |-- package.json
 |   |-- Dockerfile
 |   `-- nginx.conf
 `-- docker-compose.yml
+```
+
+## Live Deployment
+
+- Frontend: https://voltstreamapp-12.web.app
+- Backend: https://voltstream-api-2321325123.us-east4.run.app
+- API docs: https://voltstream-api-2321325123.us-east4.run.app/docs
+
+The deployed frontend is configured through `frontend/.env.production` to call the Cloud Run backend at:
+
+```text
+https://voltstream-api-2321325123.us-east4.run.app/api/v1
 ```
 
 ## Run With Docker
@@ -75,15 +90,35 @@ npm run dev
 
 ## API Routes
 
-- `GET /` - health check
 - `GET /api/v1/dashboard/live` - live dashboard metrics
 - `GET /api/v1/analytics/history?period=daily|weekly|monthly` - usage history
 - `GET /api/v1/devices/` - list devices
-- `POST /api/v1/devices/` - create a device
 - `PATCH /api/v1/devices/{id}` - update device status
-- `PUT /api/v1/devices/{id}` - replace a device
-- `DELETE /api/v1/devices/{id}` - delete a device
 - `GET /api/v1/billing/summary` - billing summary
+
+## Deployment
+
+### Backend - Cloud Run
+
+Run these commands after backend changes:
+
+```powershell
+cd C:\Users\HAVILAH\Documents\TACHYON\Voltstream\voltstream\backend
+gcloud builds submit --tag us-east4-docker.pkg.dev/voltstreamapp/cloud-run-source-deploy/voltstream/voltstream-api
+gcloud run deploy voltstream-api --image us-east4-docker.pkg.dev/voltstreamapp/cloud-run-source-deploy/voltstream/voltstream-api --region us-east4 --allow-unauthenticated
+```
+
+### Frontend - Firebase Hosting
+
+Run these commands after frontend changes:
+
+```powershell
+cd C:\Users\HAVILAH\Documents\TACHYON\Voltstream\voltstream\frontend
+npm run build
+npx firebase deploy --only hosting
+```
+
+Firebase Hosting config lives in `frontend/firebase.json`, and GitHub Actions deploy from the `frontend` entry point.
 
 ## Useful Commands
 
