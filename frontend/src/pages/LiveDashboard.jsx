@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchLiveDashboard, fetchAnalyticsHistory, fetchDevices, fetchBillingSummary } from "../api";
-import { Activity, Sun, Zap } from "lucide-react";
+import { Activity, Leaf, Sun, Zap } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import MetricCard from "../components/MetricCard";
 import LineChartPanel from "../components/LineChartPanel";
@@ -170,6 +170,7 @@ export default function LiveDashboard() {
   const projectedBill = Number(safeBilling.projected_bill) || 0;
   const totalUsage = gridUsage + solarUsage;
   const billSavings = totalUsage > 0 ? Math.round(projectedBill * (solarUsage / totalUsage)) : 0;
+  const co2SavedKg = Math.round(solarUsage * 0.82);
 
   const totalGrid = historyData.reduce((sum, item) => sum + (item.grid || 0), 0);
   const totalSolar = historyData.reduce((sum, item) => sum + (item.solar || 0), 0);
@@ -201,9 +202,9 @@ export default function LiveDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          title="Power From Grid Now"
+          title="Grid Power"
           value={safeData.grid_draw_kw}
           unit="kW"
           icon={<Zap size={26} fill="currentColor" />}
@@ -214,7 +215,7 @@ export default function LiveDashboard() {
           highlightClass="hover:border-purple-500/70 hover:shadow-[0_0_28px_rgba(139,92,246,0.18)]"
         />
         <MetricCard
-          title="Solar Power Now"
+          title="Solar Power"
           value={safeData.solar_generation_kw}
           unit="kW"
           icon={<Sun size={26} />}
@@ -225,7 +226,7 @@ export default function LiveDashboard() {
           highlightClass="hover:border-orange-500/70 hover:shadow-[0_0_28px_rgba(249,115,22,0.18)]"
         />
         <MetricCard
-          title="Bill Savings This Month"
+          title="Bill Savings"
           value={`₹${billSavings.toLocaleString("en-IN")}`}
           unit=""
           icon={<Activity size={26} />}
@@ -236,6 +237,19 @@ export default function LiveDashboard() {
           statusLabel={isExporting ? "Extra solar is helping your bill" : "Solar is reducing your bill"}
           statusTone="bg-green-100 text-green-700"
           highlightClass="hover:border-green-500/70 hover:shadow-[0_0_28px_rgba(34,197,94,0.18)]"
+        />
+        <MetricCard
+          title="Eco Impact"
+          value={co2SavedKg.toLocaleString("en-IN")}
+          unit="kg CO2"
+          icon={<Leaf size={26} />}
+          accentClass="bg-emerald-500"
+          iconBg="bg-emerald-50 text-emerald-600"
+          iconText=""
+          iconMotion="metric-icon-surplus"
+          statusLabel="Saved by solar this month"
+          statusTone="bg-emerald-100 text-emerald-700"
+          highlightClass="hover:border-emerald-500/70 hover:shadow-[0_0_28px_rgba(16,185,129,0.18)]"
         />
       </div>
 
