@@ -13,9 +13,9 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-black text-[var(--volt-yellow)]">
       <header className="bg-zinc-950 border-b border-zinc-800 shadow-sm">
-        <div className="app-shell flex h-20 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-[var(--volt-yellow)] text-black p-2 rounded-lg">
+        <div className="app-shell flex flex-col gap-4 py-4 md:flex-row md:h-20 md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="bg-[var(--volt-yellow)] text-black p-2 rounded-lg shrink-0">
               <Zap size={24} />
             </div>
             <div>
@@ -24,14 +24,14 @@ export default function Layout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <nav className="flex items-center gap-3">
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-3">
+            <nav className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto pb-1 md:justify-end">
               {navItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `font-display flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+                    `font-display flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold transition-all duration-200 ${
                       isActive
                         ? "bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] shadow-sm border border-[var(--volt-yellow-border)]"
                         : "text-zinc-400 hover:text-[var(--volt-yellow)] hover:bg-zinc-900"
@@ -43,7 +43,7 @@ export default function Layout() {
                 </NavLink>
               ))}
             </nav>
-            <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-200 shadow-sm">
+            <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-200 shadow-sm md:ml-auto">
               <div className="bg-[var(--volt-yellow)] text-black rounded-full p-2">
                 <User size={16} />
               </div>
