@@ -45,7 +45,7 @@ export default function UsageHistory() {
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300 ring-1 ring-violet-500/20">
                 <BarChart3 size={22} />
               </span>
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Historical Grid Use</p>
+              <p className="font-display text-sm font-semibold uppercase text-[var(--volt-yellow)]">Historical Grid Use</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-white">{totalGrid.toFixed(0)} kWh</p>
             <p className="mt-1 text-sm text-zinc-500">Total grid energy for this {period} view</p>
@@ -55,7 +55,7 @@ export default function UsageHistory() {
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-300 ring-1 ring-orange-500/20">
                 <Sun size={22} />
               </span>
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Solar Generated</p>
+              <p className="font-display text-sm font-semibold uppercase text-[var(--volt-yellow)]">Solar Generated</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-[var(--volt-yellow)]">{totalSolar.toFixed(0)} kWh</p>
             <p className="mt-1 text-sm text-zinc-500">Solar contribution in the same period</p>
@@ -65,7 +65,7 @@ export default function UsageHistory() {
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20">
                 <Leaf size={22} />
               </span>
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Solar Coverage</p>
+              <p className="font-display text-sm font-semibold uppercase text-[var(--volt-yellow)]">Solar Coverage</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-emerald-300">{solarCoverage}%</p>
             <p className="mt-1 text-sm text-zinc-500">How much grid usage solar helped offset</p>
@@ -75,7 +75,7 @@ export default function UsageHistory() {
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)]">
                 <CalendarClock size={22} />
               </span>
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Peak Grid Period</p>
+              <p className="font-display text-sm font-semibold uppercase text-[var(--volt-yellow)]">Peak Grid Period</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-white">{peakGrid.label ?? "--"}</p>
             <p className="mt-1 text-sm text-zinc-500">{Number(peakGrid.grid ?? 0).toFixed(0)} kWh was the highest grid use</p>

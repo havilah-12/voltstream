@@ -6,7 +6,7 @@ export default function MetricCard({ title, value, unit, icon, accentClass, icon
       <div className={`metric-icon w-12 h-12 ${iconBg} ${iconText} ${iconMotion} rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
         {icon}
       </div>
-      <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">{title}</p>
+      <p className="font-display text-base font-semibold uppercase text-[var(--volt-yellow)]">{title}</p>
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-3xl font-bold text-white">{value}</span>
         {unit ? <span className="text-base font-medium text-zinc-500">{unit}</span> : null}
