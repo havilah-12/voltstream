@@ -1,58 +1,29 @@
 import { useEffect, useState } from "react";
 import { fetchLiveDashboard, fetchAnalyticsHistory, fetchDevices, fetchBillingSummary } from "../api";
-import { Activity, Leaf, Sun, Zap } from "lucide-react";
+import { Activity, IndianRupee, Leaf, Sun, Zap } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import MetricCard from "../components/MetricCard";
 import LineChartPanel from "../features/dashboard/LineChartPanel";
 import PieChartPanel from "../features/dashboard/PieChartPanel";
 import TopConsumersTable from "../features/dashboard/TopConsumersTable";
 
-const fallbackLiveData = {
-  grid_draw_kw: 2.4,
-  solar_generation_kw: 3.1,
-  net_usage_kw: -0.7,
-};
-
-const fallbackBilling = {
-  projected_bill: 3200,
-  current_grid_data_usage: 320,
-  solar_energy_usage: 210,
-};
-
-const fallbackHistory = [
-  { label: "00:00", grid: 1.1, solar: 0 },
-  { label: "06:00", grid: 1.5, solar: 0.6 },
-  { label: "09:00", grid: 2.1, solar: 2.4 },
-  { label: "12:00", grid: 2.6, solar: 3.7 },
-  { label: "15:00", grid: 2.3, solar: 3.4 },
-  { label: "18:00", grid: 2.8, solar: 1.2 },
-];
-
-const fallbackDevices = [
-  { id: "d1", name: "AC", status: "ON", power_usage_w: 1500 },
-  { id: "d2", name: "Fan", status: "OFF", power_usage_w: 50 },
-  { id: "d3", name: "Washing Machine", status: "ON", power_usage_w: 500 },
-  { id: "d4", name: "Fridge", status: "ON", power_usage_w: 200 },
-  { id: "d5", name: "Heater", status: "OFF", power_usage_w: 200 },
-  { id: "d6", name: "Light", status: "ON", power_usage_w: 18 },
-  { id: "d7", name: "TV", status: "OFF", power_usage_w: 120 },
-  { id: "d8", name: "Laptop", status: "ON", power_usage_w: 65 },
-  { id: "d9", name: "Water Heater", status: "OFF", power_usage_w: 3000 },
-];
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function buildTodayFlow(history, liveData, now) {
-  const seedData = history.length > 0 ? history : fallbackHistory;
+  if (!history.length || !liveData) {
+    return [];
+  }
+
   const intervalMinutes = 15;
   const totalPoints = 17;
   const points = Array.from({ length: totalPoints }, (_, index) => {
     const pointTime = new Date(now);
     const minutesBack = (totalPoints - 1 - index) * intervalMinutes;
     pointTime.setMinutes(now.getMinutes() - minutesBack, 0, 0);
-    const seed = seedData[index % seedData.length] ?? fallbackHistory[index % fallbackHistory.length];
+    const seed = history[index % history.length];
     const progress = index / (totalPoints - 1);
     const liveBlend = index === totalPoints - 1 ? 1 : progress * 0.65;
     const daytimeBoost = pointTime.getHours() >= 7 && pointTime.getHours() <= 17 ? 1 : 0.55;
@@ -115,11 +86,7 @@ export default function LiveDashboard() {
 
       const failed = results.filter((result) => result.status === "rejected");
       if (failed.length === results.length) {
-        setData(fallbackLiveData);
-        setHistoryData(fallbackHistory);
-        setDevicesData(fallbackDevices);
-        setBillingData(fallbackBilling);
-        setWarning("Using local fallback data because the backend is unreachable.");
+        setError("Unable to load dashboard data. Please check your network or API.");
       } else if (failed.length > 0) {
         setWarning(
           "Some dashboard data could not be loaded and is shown partially."
@@ -163,7 +130,11 @@ export default function LiveDashboard() {
     solar_generation_kw: 0,
     net_usage_kw: 0
   };
-  const safeBilling = billingData ?? fallbackBilling;
+  const safeBilling = billingData ?? {
+    projected_bill: 0,
+    current_grid_data_usage: 0,
+    solar_energy_usage: 0,
+  };
   const isExporting = safeData.net_usage_kw < 0;
   const gridUsage = Number(safeBilling.current_grid_data_usage) || 0;
   const solarUsage = Number(safeBilling.solar_energy_usage) || 0;
@@ -171,10 +142,10 @@ export default function LiveDashboard() {
   const totalUsage = gridUsage + solarUsage;
   const gridUnitRate = gridUsage > 0 ? projectedBill / gridUsage : 0;
   const billSavings = Math.round(solarUsage * gridUnitRate);
-  const gridBill = projectedBill;
   const gridShare = totalUsage > 0 ? `${Math.round((gridUsage / totalUsage) * 100)}%` : "0%";
   const solarShare = totalUsage > 0 ? `${Math.round((solarUsage / totalUsage) * 100)}%` : "0%";
   const co2SavedKg = Math.round(solarUsage * 0.82);
+  const energyBalance = Math.abs(Number(safeData.net_usage_kw) || 0);
 
   const totalGrid = historyData.reduce((sum, item) => sum + (item.grid || 0), 0);
   const totalSolar = historyData.reduce((sum, item) => sum + (item.solar || 0), 0);
@@ -206,7 +177,7 @@ export default function LiveDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           title="Grid Power"
           value={safeData.grid_draw_kw}
@@ -216,7 +187,7 @@ export default function LiveDashboard() {
           iconBg="bg-purple-50"
           iconText="text-purple-600"
           iconMotion="metric-icon-grid"
-          statusLabel={`Grid is ${gridShare} of usage · ₹${gridBill.toLocaleString("en-IN")}`}
+          statusLabel={`Grid is ${gridShare} of usage`}
           statusTone="bg-purple-100 text-purple-700"
           highlightClass="hover:border-purple-500/70 hover:shadow-[0_0_28px_rgba(139,92,246,0.18)]"
         />
@@ -234,10 +205,23 @@ export default function LiveDashboard() {
           highlightClass="hover:border-orange-500/70 hover:shadow-[0_0_28px_rgba(249,115,22,0.18)]"
         />
         <MetricCard
+          title="Energy Balance"
+          value={energyBalance}
+          unit="kW"
+          icon={<Activity size={26} />}
+          accentClass={isExporting ? "bg-cyan-500" : "bg-red-500"}
+          iconBg={isExporting ? "bg-cyan-50 text-cyan-600" : "bg-red-50 text-red-600"}
+          iconText=""
+          iconMotion={isExporting ? "metric-icon-surplus" : "metric-icon-grid"}
+          statusLabel={isExporting ? "Extra solar sent back" : "Extra grid power needed"}
+          statusTone={isExporting ? "bg-cyan-100 text-cyan-700" : "bg-red-100 text-red-700"}
+          highlightClass={isExporting ? "hover:border-cyan-500/70 hover:shadow-[0_0_28px_rgba(6,182,212,0.18)]" : "hover:border-red-500/70 hover:shadow-[0_0_28px_rgba(239,68,68,0.18)]"}
+        />
+        <MetricCard
           title="Bill Savings"
           value={`₹${billSavings.toLocaleString("en-IN")}`}
           unit=""
-          icon={<Activity size={26} />}
+          icon={<IndianRupee size={26} />}
           accentClass="bg-green-500"
           iconBg="bg-green-50 text-green-600"
           iconText=""

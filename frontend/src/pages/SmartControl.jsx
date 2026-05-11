@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api";
+import VoltSelect from "../components/VoltSelect";
 import {
   AirVent,
   ChevronDown,
@@ -25,6 +26,10 @@ import {
 const getDeviceType = (device) => device.type ?? device.name;
 const getDeviceLabel = (device) => `${device.name}${device.location ? ` - ${device.location}` : ""}`;
 const emptyForm = { type: "AC", name: "AC 1", location: "Bedroom 1", status: "OFF", power_usage_w: 1500 };
+const statusOptions = [
+  { value: "ON", label: "Currently Running" },
+  { value: "OFF", label: "Turned Off" },
+];
 
 const householdDefaults = [
   { id: "cooler-1", type: "Cooler", name: "Cooler 1", location: "Living Room", status: "OFF", power_usage_w: 220 },
@@ -326,6 +331,10 @@ export default function SmartControl() {
   const totalPages = Math.max(1, Math.ceil(selectedGroups.length / cardsPerPage));
   const currentPage = Math.min(page, totalPages);
   const visibleGroups = selectedGroups.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage);
+  const seasonalOptions = Object.entries(seasonalModes).map(([key, mode]) => ({
+    value: key,
+    label: mode.label,
+  }));
 
   return (
     <div className="space-y-6">
@@ -376,14 +385,14 @@ export default function SmartControl() {
             placeholder="Watts"
             className="rounded-xl border border-zinc-700 bg-black px-4 py-3 text-white outline-none focus:border-[var(--volt-yellow)]"
           />
-          <select
+          <VoltSelect
             value={form.status}
-            onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}
-            className="rounded-xl border border-zinc-700 bg-black px-4 py-3 text-white outline-none focus:border-[var(--volt-yellow)]"
-          >
-            <option value="ON">Currently Running</option>
-            <option value="OFF">Turned Off</option>
-          </select>
+            onChange={(status) => setForm((prev) => ({ ...prev, status }))}
+            options={statusOptions}
+            ariaLabel="Device status"
+            className="md:col-span-1"
+            buttonClassName="h-full min-h-[48px] border-zinc-700 px-4 py-3"
+          />
           <div className="flex gap-2">
             <button type="submit" className="flex-1 rounded-xl bg-[var(--volt-yellow)] px-4 py-3 font-bold text-black">
               Save
@@ -418,20 +427,14 @@ export default function SmartControl() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative min-w-[220px]">
-              <select
-                value={seasonalMode}
-                onChange={(event) => applySeasonalMode(event.target.value)}
-                aria-label="Seasonal mode"
-                title={seasonalModes[seasonalMode].helper}
-                className="h-10 w-full appearance-none rounded-xl border border-zinc-700 bg-black px-3 pr-9 text-sm font-bold text-white outline-none transition-colors hover:border-[var(--volt-yellow-border)] focus:border-[var(--volt-yellow)]"
-              >
-                {Object.entries(seasonalModes).map(([key, mode]) => (
-                  <option key={key} value={key}>{mode.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            </div>
+            <VoltSelect
+              value={seasonalMode}
+              onChange={applySeasonalMode}
+              options={seasonalOptions}
+              ariaLabel="Seasonal mode"
+              title={seasonalModes[seasonalMode].helper}
+              className="min-w-[220px]"
+            />
             <button
               type="button"
               onClick={() => beginAdd()}

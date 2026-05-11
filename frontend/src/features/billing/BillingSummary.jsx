@@ -9,11 +9,11 @@ export default function BillingSummary({ balance, gridUsage, solarUsage, gridBil
         <div className="w-10 h-10 bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] rounded-full flex items-center justify-center">
           <IndianRupee size={20} />
         </div>
-        <h3 className="text-xl font-semibold text-white">Bill Generated So Far</h3>
+        <h3 className="text-xl font-semibold text-white">Generated Bill</h3>
       </div>
       <div className="mb-5">
         <span className="text-5xl font-bold text-[var(--volt-yellow)]">₹{balance}</span>
-        <p className="text-zinc-400 mt-2 text-sm font-medium">Current bill generated this month</p>
+        <p className="text-zinc-400 mt-2 text-sm font-medium">Bill generated this month so far</p>
       </div>
       <div className="mt-auto border-t border-zinc-800 pt-4">
         <h4 className="text-sm font-semibold text-white mb-3">Grid And Solar Bill Split</h4>
