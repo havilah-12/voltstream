@@ -1,3 +1,4 @@
+// Used by the Dashboard page to list devices with the highest power draw.
 export default function TopConsumersTable({ devices }) {
   const deviceList = Array.isArray(devices) ? devices : [];
 

@@ -1,3 +1,4 @@
+// Used by Dashboard, Usage History, Smart Control, and Billing pages.
 export default function PageHeader({ title, subtitle, className = "" }) {
   return (
     <div className={`flex flex-col gap-2 ${className}`}>

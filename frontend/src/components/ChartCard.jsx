@@ -1,3 +1,4 @@
+// Used by chart feature panels on Dashboard and Usage History pages.
 export default function ChartCard({ title, children, className = "" }) {
   return (
     <div className={`relative flex flex-col bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950/80 rounded-3xl p-6 shadow-xl border border-zinc-800/60 backdrop-blur-sm overflow-hidden ${className}`}>

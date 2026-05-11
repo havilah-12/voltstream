@@ -1,6 +1,7 @@
+// Used by the Dashboard page to chart today's live grid and solar flow.
 import { AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area } from "recharts";
 import { CHART_ANIMATION, THEME_COLORS } from "../../constants/theme";
-import ChartCard from "./ChartCard";
+import ChartCard from "../../components/ChartCard";
 
 const energyColors = {
   "Grid (kW)": THEME_COLORS.gridGradientStart,

@@ -1,3 +1,4 @@
+// Used by the Smart Control page to display overall system status.
 export default function SystemStatusPill({ status = "online" }) {
   const isOnline = status === "online";
   return (

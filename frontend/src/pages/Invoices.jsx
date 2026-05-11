@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { fetchBillingSummary } from "../api";
 import { AlertTriangle, Sun } from "lucide-react";
-import PageHeader from "../components/ui/PageHeader";
-import BillingSummary from "../components/billing/BillingSummary";
-import BudgetOverview from "../components/billing/BudgetOverview";
-import InvoiceHistory from "../components/billing/InvoiceHistory";
+import PageHeader from "../components/PageHeader";
+import BillingSummary from "../features/billing/BillingSummary";
+import BudgetOverview from "../features/billing/BudgetOverview";
+import InvoiceHistory from "../features/billing/InvoiceHistory";
 
 const fallbackBilling = {
   current_balance: 1850,

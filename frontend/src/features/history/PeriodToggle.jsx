@@ -1,3 +1,4 @@
+// Used by the Usage History page to switch daily, weekly, and monthly views.
 export default function PeriodToggle({ options, selected, onChange }) {
   return (
     <div className="bg-zinc-900 p-1 rounded-xl inline-flex border border-zinc-800">

@@ -1,6 +1,7 @@
+// Used by the Usage History page to compare grid usage and solar generation.
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { CHART_ANIMATION, THEME_COLORS } from "../../constants/theme";
-import ChartCard from "./ChartCard";
+import ChartCard from "../../components/ChartCard";
 
 const energyColors = {
   "Grid Usage (kWh)": THEME_COLORS.gridGradientStart,

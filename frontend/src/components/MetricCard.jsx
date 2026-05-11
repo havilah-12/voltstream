@@ -1,3 +1,4 @@
+// Used by the Dashboard page for grid, solar, bill savings, and eco metrics.
 export default function MetricCard({ title, value, unit, icon, accentClass, iconBg, iconText, iconMotion = "", statusLabel, statusTone, highlightClass = "hover:border-[var(--volt-yellow-border)]" }) {
   return (
     <div className={`bg-zinc-900 rounded-2xl p-5 shadow-sm border border-zinc-800 flex flex-col items-center justify-center text-center relative overflow-hidden group transition-colors min-h-[190px] ${highlightClass}`}>

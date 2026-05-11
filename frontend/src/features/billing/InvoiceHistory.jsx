@@ -1,3 +1,4 @@
+// Used by the Billing page to show recent invoice records.
 import { CheckCircle2, Receipt } from "lucide-react";
 
 export default function InvoiceHistory({ invoices }) {

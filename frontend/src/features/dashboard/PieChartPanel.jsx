@@ -1,6 +1,7 @@
+// Used by the Dashboard page to show grid versus solar usage share.
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { THEME_COLORS } from "../../constants/theme";
-import ChartCard from "./ChartCard";
+import ChartCard from "../../components/ChartCard";
 
 const sourceColors = {
   "Grid Usage": THEME_COLORS.gridGradientStart,

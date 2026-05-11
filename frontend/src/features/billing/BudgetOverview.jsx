@@ -1,3 +1,4 @@
+// Used by the Billing page to compare projected spend against the budget.
 import { CalendarClock, CreditCard, IndianRupee } from "lucide-react";
 
 export default function BudgetOverview({ netProjectedBill, budgetLimit, isOverBudget, canPay, nextPaymentDate }) {

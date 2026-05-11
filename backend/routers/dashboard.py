@@ -1,12 +1,8 @@
-import logging
-
 from fastapi import APIRouter
-from mock_data import mock_db
+from services.dashboard_service import get_live_dashboard as get_live_dashboard_data
 
-logger = logging.getLogger("voltstream")
 router = APIRouter()
 
 @router.get("/live")
 def get_live_dashboard():
-    logger.info("Dashboard live data requested")
-    return mock_db["dashboard_live"]
+    return get_live_dashboard_data()

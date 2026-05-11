@@ -1,3 +1,4 @@
+// Used by the Billing page to summarize current bill and source split.
 import { IndianRupee } from "lucide-react";
 import { THEME_COLORS } from "../../constants/theme";
 

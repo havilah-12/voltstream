@@ -1,3 +1,4 @@
+// Used by App.jsx as the shared shell for every route page.
 import { Outlet, NavLink } from "react-router-dom";
 import { LayoutDashboard, BarChart3, Settings2, Receipt, Zap, User } from "lucide-react";
 
