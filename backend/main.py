@@ -20,7 +20,7 @@ async def log_requests(request: Request, call_next):
 def configure_middleware(api: FastAPI) -> None:
     api.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["https://voltstreamapp-12.web.app", "http://localhost:5173"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
