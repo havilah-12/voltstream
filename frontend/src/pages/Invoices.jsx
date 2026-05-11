@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchBillingSummary } from "../api";
+import { fetchBillingSummary } from "../api/billingApi";
 import { AlertTriangle, Sun } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import BillingSummary from "../features/billing/BillingSummary";

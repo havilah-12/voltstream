@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api";
+import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api/devicesApi";
 import VoltSelect from "../components/VoltSelect";
 import {
   AirVent,
@@ -487,6 +487,7 @@ export default function SmartControl() {
                 const device = group.find((item) => item.id === selectedId) ?? group[0];
                 const isOn = device.status === "ON";
                 const runningCount = group.filter((item) => item.status === "ON").length;
+                const hasRunningUnit = runningCount > 0;
                 const config = getTypeConfig(type);
                 const DeviceIcon = config.icon;
 
@@ -494,7 +495,7 @@ export default function SmartControl() {
                   <div 
                     key={type} 
                     className={`relative overflow-hidden rounded-2xl p-4 border transition-all duration-300 ${
-                      isOn 
+                      hasRunningUnit 
                         ? 'bg-zinc-900 text-white border-[var(--volt-yellow-border)] shadow-[0_0_22px_var(--volt-yellow-glow)]' 
                         : 'bg-zinc-900 text-white border-zinc-800 shadow-sm hover:border-[var(--volt-yellow-border)]'
                     }`}
@@ -528,7 +529,7 @@ export default function SmartControl() {
                           type="button"
                           onClick={() => setOpenUnitMenu((current) => (current === type ? null : type))}
                           className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm font-semibold outline-none transition-colors ${
-                            isOn
+                            hasRunningUnit
                               ? 'border-[var(--volt-yellow-border)] bg-black/35 text-white hover:border-[var(--volt-yellow)]'
                               : 'border-zinc-700 bg-zinc-950 text-white hover:border-[var(--volt-yellow-border)]'
                           }`}
@@ -536,7 +537,7 @@ export default function SmartControl() {
                           <span className="truncate">{getDeviceLabel(device)}</span>
                           <ChevronDown
                             size={16}
-                            className={`shrink-0 ${isOn ? 'text-[var(--volt-yellow)]' : 'text-zinc-500'}`}
+                            className={`shrink-0 ${hasRunningUnit ? 'text-[var(--volt-yellow)]' : 'text-zinc-500'}`}
                           />
                         </button>
                         {openUnitMenu === type && (
@@ -574,16 +575,16 @@ export default function SmartControl() {
                     )}
 
                     <div className="mb-4 flex items-center justify-between gap-3 text-sm">
-                      <span className={isOn ? 'text-zinc-300' : 'text-zinc-500'}>{device.location ?? "Whole house"}</span>
+                      <span className={hasRunningUnit ? 'text-zinc-300' : 'text-zinc-500'}>{device.location ?? "Whole house"}</span>
                       <span className="font-bold text-white">{device.power_usage_w} W</span>
                     </div>
 
                     <div className="flex items-center justify-between gap-3 border-t border-zinc-800 pt-3">
                       <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
-                        isOn ? 'bg-green-500/10 text-green-300' : 'bg-zinc-800 text-zinc-500'
+                        hasRunningUnit ? 'bg-green-500/10 text-green-300' : 'bg-zinc-800 text-zinc-500'
                       }`}>
-                        <span className={`h-2 w-2 rounded-full ${isOn ? 'bg-green-500' : 'bg-zinc-600'}`}></span>
-                        {isOn ? 'On' : 'Off'}
+                        <span className={`h-2 w-2 rounded-full ${hasRunningUnit ? 'bg-green-500' : 'bg-zinc-600'}`}></span>
+                        {hasRunningUnit ? `${runningCount} On` : 'Off'}
                       </span>
                       <div className="flex items-center gap-2">
                         <button
@@ -603,7 +604,7 @@ export default function SmartControl() {
                       </div>
                     </div>
 
-                    {isOn && (
+                    {hasRunningUnit && (
                       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(234,179,8,0.10),rgba(234,179,8,0.03)_45%,transparent_70%)]"></div>
                     )}
                   </div>

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchLiveDashboard, fetchAnalyticsHistory, fetchDevices, fetchBillingSummary } from "../api";
+import { fetchAnalyticsHistory } from "../api/analyticsApi";
+import { fetchBillingSummary } from "../api/billingApi";
+import { fetchLiveDashboard } from "../api/dashboardApi";
+import { fetchDevices } from "../api/devicesApi";
 import { Activity, IndianRupee, Leaf, Sun, Zap } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import MetricCard from "../components/MetricCard";
