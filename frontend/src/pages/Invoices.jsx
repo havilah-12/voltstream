@@ -18,13 +18,13 @@ function getSolarAdjustedBilling(summary) {
   const gridUsage = Number(summary.current_grid_data_usage) || 0;
   const solarUsage = Number(summary.solar_energy_usage) || 0;
   const projectedBill = Number(summary.projected_bill) || 0;
-  const totalUsage = gridUsage + solarUsage;
-  const gridShare = totalUsage > 0 ? gridUsage / totalUsage : 1;
-  const netProjectedBill = Math.round(projectedBill * gridShare);
+  const gridUnitRate = gridUsage > 0 ? projectedBill / gridUsage : 0;
+  const solarCredit = Math.round(solarUsage * gridUnitRate);
+  const netProjectedBill = Math.max(projectedBill - solarCredit, 0);
 
   return {
     netProjectedBill,
-    solarCredit: Math.max(projectedBill - netProjectedBill, 0),
+    solarCredit,
     solarSurplusKwh: Math.max(solarUsage - gridUsage, 0),
   };
 }

@@ -169,7 +169,11 @@ export default function LiveDashboard() {
   const solarUsage = Number(safeBilling.solar_energy_usage) || 0;
   const projectedBill = Number(safeBilling.projected_bill) || 0;
   const totalUsage = gridUsage + solarUsage;
-  const billSavings = totalUsage > 0 ? Math.round(projectedBill * (solarUsage / totalUsage)) : 0;
+  const gridUnitRate = gridUsage > 0 ? projectedBill / gridUsage : 0;
+  const billSavings = Math.round(solarUsage * gridUnitRate);
+  const gridBill = projectedBill;
+  const gridShare = totalUsage > 0 ? `${Math.round((gridUsage / totalUsage) * 100)}%` : "0%";
+  const solarShare = totalUsage > 0 ? `${Math.round((solarUsage / totalUsage) * 100)}%` : "0%";
   const co2SavedKg = Math.round(solarUsage * 0.82);
 
   const totalGrid = historyData.reduce((sum, item) => sum + (item.grid || 0), 0);
@@ -212,6 +216,8 @@ export default function LiveDashboard() {
           iconBg="bg-purple-50"
           iconText="text-purple-600"
           iconMotion="metric-icon-grid"
+          statusLabel={`Grid is ${gridShare} of usage · ₹${gridBill.toLocaleString("en-IN")}`}
+          statusTone="bg-purple-100 text-purple-700"
           highlightClass="hover:border-purple-500/70 hover:shadow-[0_0_28px_rgba(139,92,246,0.18)]"
         />
         <MetricCard
@@ -223,6 +229,8 @@ export default function LiveDashboard() {
           iconBg="bg-orange-50"
           iconText="text-orange-500"
           iconMotion="metric-icon-solar"
+          statusLabel={`${solarShare} solar share`}
+          statusTone="bg-orange-100 text-orange-700"
           highlightClass="hover:border-orange-500/70 hover:shadow-[0_0_28px_rgba(249,115,22,0.18)]"
         />
         <MetricCard
@@ -234,7 +242,7 @@ export default function LiveDashboard() {
           iconBg="bg-green-50 text-green-600"
           iconText=""
           iconMotion="metric-icon-surplus"
-          statusLabel={isExporting ? "Extra solar is helping your bill" : "Solar is reducing your bill"}
+          statusLabel={isExporting ? "Extra solar is helping your bill" : `Avoiding ₹${billSavings.toLocaleString("en-IN")} from grid`}
           statusTone="bg-green-100 text-green-700"
           highlightClass="hover:border-green-500/70 hover:shadow-[0_0_28px_rgba(34,197,94,0.18)]"
         />
