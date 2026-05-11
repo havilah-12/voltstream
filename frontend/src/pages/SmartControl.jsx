@@ -3,6 +3,7 @@ import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceSta
 import VoltSelect from "../components/VoltSelect";
 import {
   AirVent,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -160,6 +161,7 @@ export default function SmartControl() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     fetchDevices()
@@ -176,6 +178,12 @@ export default function SmartControl() {
       .catch((err) => setError(err.message || "Unable to load devices."))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!successMessage) return undefined;
+    const timer = window.setTimeout(() => setSuccessMessage(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
 
   const toggleDevice = async (id, currentStatus) => {
     const newStatus = currentStatus === "ON" ? "OFF" : "ON";
@@ -208,6 +216,7 @@ export default function SmartControl() {
 
   const beginAdd = (type = "AC") => {
     const count = devices.filter((device) => getDeviceType(device) === type).length + 1;
+    setSuccessMessage("");
     setEditingId("new");
     setForm({
       type,
@@ -267,10 +276,12 @@ export default function SmartControl() {
       const created = await createDevice(payload);
       setDevices((prev) => [...prev, created]);
       setSelectedByType((prev) => ({ ...prev, [getDeviceType(created)]: created.id }));
+      setSuccessMessage("Device added successfully.");
     } else {
       const updated = await updateDevice(editingId, payload);
       setDevices((prev) => prev.map((device) => (device.id === editingId ? updated : device)));
       setSelectedByType((prev) => ({ ...prev, [getDeviceType(updated)]: updated.id }));
+      setSuccessMessage("Device updated successfully.");
     }
 
     setEditingId(null);
@@ -404,6 +415,13 @@ export default function SmartControl() {
         </form>
       )}
 
+      {successMessage ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4 text-sm font-bold text-emerald-300">
+          <CheckCircle2 size={20} />
+          <span>{successMessage}</span>
+        </div>
+      ) : null}
+
       <div className="space-y-4">
         <div className="flex flex-col gap-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
@@ -494,7 +512,9 @@ export default function SmartControl() {
                 return (
                   <div 
                     key={type} 
-                    className={`relative overflow-hidden rounded-2xl p-4 border transition-all duration-300 ${
+                    className={`relative rounded-2xl p-4 border transition-all duration-300 ${
+                      openUnitMenu === type ? "z-40 overflow-visible" : "overflow-hidden"
+                    } ${
                       hasRunningUnit 
                         ? 'bg-zinc-900 text-white border-[var(--volt-yellow-border)] shadow-[0_0_22px_var(--volt-yellow-glow)]' 
                         : 'bg-zinc-900 text-white border-zinc-800 shadow-sm hover:border-[var(--volt-yellow-border)]'
@@ -541,7 +561,7 @@ export default function SmartControl() {
                           />
                         </button>
                         {openUnitMenu === type && (
-                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-44 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
                             {group.map((item) => {
                               const selected = item.id === device.id;
                               return (
