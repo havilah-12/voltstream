@@ -19,6 +19,14 @@ export default function UsageHistory() {
       .finally(() => setLoading(false));
   }, [period]);
 
+  const totalGrid = data.reduce((sum, item) => sum + Number(item.grid ?? 0), 0);
+  const totalSolar = data.reduce((sum, item) => sum + Number(item.solar ?? 0), 0);
+  const solarCoverage = totalGrid > 0 ? Math.round((totalSolar / totalGrid) * 100) : 0;
+  const peakGrid = data.reduce(
+    (peak, item) => (Number(item.grid ?? 0) > Number(peak.grid ?? 0) ? item : peak),
+    data[0] ?? {}
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -28,6 +36,31 @@ export default function UsageHistory() {
         />
         <PeriodToggle options={["daily", "weekly", "monthly"]} selected={period} onChange={setPeriod} />
       </div>
+
+      {!loading && !error && data.length > 0 ? (
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Historical Grid Use</p>
+            <p className="mt-2 text-2xl font-bold text-white">{totalGrid.toFixed(0)} kWh</p>
+            <p className="mt-1 text-sm text-zinc-500">Total grid energy for this {period} view</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Solar Generated</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--volt-yellow)]">{totalSolar.toFixed(0)} kWh</p>
+            <p className="mt-1 text-sm text-zinc-500">Solar contribution in the same period</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Solar Coverage</p>
+            <p className="mt-2 text-2xl font-bold text-emerald-300">{solarCoverage}%</p>
+            <p className="mt-1 text-sm text-zinc-500">How much grid usage solar helped offset</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Peak Grid Period</p>
+            <p className="mt-2 text-2xl font-bold text-white">{peakGrid.label ?? "--"}</p>
+            <p className="mt-1 text-sm text-zinc-500">{Number(peakGrid.grid ?? 0).toFixed(0)} kWh was the highest grid use</p>
+          </div>
+        </section>
+      ) : null}
 
       <div className="h-[500px]">
         {loading ? (
