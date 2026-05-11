@@ -1,5 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { CHART_ANIMATION, THEME_COLORS } from "../constants/theme";
+import { CHART_ANIMATION, THEME_COLORS } from "../../constants/theme";
 import ChartCard from "./ChartCard";
 
 const energyColors = {

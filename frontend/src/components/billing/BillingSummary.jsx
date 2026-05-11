@@ -1,5 +1,5 @@
 import { IndianRupee } from "lucide-react";
-import { THEME_COLORS } from "../constants/theme";
+import { THEME_COLORS } from "../../constants/theme";
 
 export default function BillingSummary({ balance, gridUsage, solarUsage, gridBill, solarSavings }) {
   return (

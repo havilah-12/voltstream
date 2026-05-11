@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { fetchAnalyticsHistory } from "../api";
-import PageHeader from "../components/PageHeader";
-import PeriodToggle from "../components/PeriodToggle";
-import BarChartPanel from "../components/BarChartPanel";
+import PageHeader from "../components/ui/PageHeader";
+import PeriodToggle from "../components/dashboard/PeriodToggle";
+import BarChartPanel from "../components/charts/BarChartPanel";
 
 export default function UsageHistory() {
   const [period, setPeriod] = useState("daily");

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { fetchLiveDashboard, fetchAnalyticsHistory, fetchDevices, fetchBillingSummary } from "../api";
 import { Activity, Leaf, Sun, Zap } from "lucide-react";
-import PageHeader from "../components/PageHeader";
-import MetricCard from "../components/MetricCard";
-import LineChartPanel from "../components/LineChartPanel";
-import PieChartPanel from "../components/PieChartPanel";
-import TopConsumersTable from "../components/TopConsumersTable";
+import PageHeader from "../components/ui/PageHeader";
+import MetricCard from "../components/ui/MetricCard";
+import LineChartPanel from "../components/charts/LineChartPanel";
+import PieChartPanel from "../components/charts/PieChartPanel";
+import TopConsumersTable from "../components/dashboard/TopConsumersTable";
 
 const fallbackLiveData = {
   grid_draw_kw: 2.4,

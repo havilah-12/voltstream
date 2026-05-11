@@ -1,5 +1,5 @@
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { THEME_COLORS } from "../constants/theme";
+import { THEME_COLORS } from "../../constants/theme";
 import ChartCard from "./ChartCard";
 
 const sourceColors = {

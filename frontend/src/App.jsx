@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./layouts/Layout";
+import Layout from "./components/Layout";
 import LiveDashboard from "./pages/LiveDashboard";
 import UsageHistory from "./pages/UsageHistory";
 import SmartControl from "./pages/SmartControl";
