@@ -4,6 +4,10 @@ import axios from "axios";
 const CLOUD_RUN_API_BASE_URL = "https://voltstream-api-2321325123.us-east4.run.app/api/v1";
 
 const DEFAULT_API_BASE_URLS = [
+  "http://localhost:8010/api/v1",
+  "http://127.0.0.1:8010/api/v1",
+  "http://localhost:8002/api/v1",
+  "http://127.0.0.1:8002/api/v1",
   "/api/v1",
   CLOUD_RUN_API_BASE_URL,
   "http://localhost:8000/api/v1",

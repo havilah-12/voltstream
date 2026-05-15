@@ -1,25 +1,42 @@
 // Used by the Billing page to summarize current bill and source split.
-import { IndianRupee } from "lucide-react";
+import { Download, IndianRupee } from "lucide-react";
 import { THEME_COLORS } from "../../constants/theme";
 
-export default function BillingSummary({ balance, gridUsage, solarUsage, gridBill, solarSavings }) {
+export default function BillingSummary({
+  balance,
+  gridUsage,
+  solarUsage,
+  gridBill,
+  solarSavings,
+  onDownloadCurrentInvoice,
+}) {
   return (
-    <div className="h-full bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-800 flex flex-col">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] rounded-full flex items-center justify-center">
-          <IndianRupee size={20} />
+    <div className="flex h-full flex-col rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)]">
+            <IndianRupee size={20} />
+          </div>
+          <h3 className="text-xl font-semibold text-white">Generated Bill</h3>
         </div>
-        <h3 className="text-xl font-semibold text-white">Generated Bill</h3>
+        <button
+          type="button"
+          onClick={onDownloadCurrentInvoice}
+          className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-zinc-300 transition-colors hover:border-[var(--volt-yellow-border)] hover:text-[var(--volt-yellow)]"
+        >
+          <Download size={14} />
+          PDF
+        </button>
       </div>
       <div className="mb-5">
         <span className="text-5xl font-bold text-[var(--volt-yellow)]">₹{balance}</span>
-        <p className="text-zinc-400 mt-2 text-sm font-medium">Bill generated this month so far</p>
+        <p className="mt-2 text-sm font-medium text-zinc-400">Bill generated this month so far</p>
       </div>
       <div className="mt-auto border-t border-zinc-800 pt-4">
-        <h4 className="text-sm font-semibold text-white mb-3">Grid And Solar Bill Split</h4>
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-black/20 px-4 py-3 mb-3">
-          <span className="text-sm text-zinc-400 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: THEME_COLORS.grid }}></div>
+        <h4 className="mb-3 text-sm font-semibold text-white">Grid And Solar Bill Split</h4>
+        <div className="mb-3 flex items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-black/20 px-4 py-3">
+          <span className="flex items-center gap-2 text-sm text-zinc-400">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: THEME_COLORS.grid }}></div>
             Grid
           </span>
           <div className="text-right">
@@ -28,8 +45,8 @@ export default function BillingSummary({ balance, gridUsage, solarUsage, gridBil
           </div>
         </div>
         <div className="flex items-center justify-between gap-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
-          <span className="text-sm text-zinc-400 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: THEME_COLORS.solar }}></div>
+          <span className="flex items-center gap-2 text-sm text-zinc-400">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: THEME_COLORS.solar }}></div>
             Solar
           </span>
           <div className="text-right">

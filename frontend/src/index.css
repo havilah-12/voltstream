@@ -101,6 +101,62 @@ select option:focus {
   transform-origin: center;
 }
 
+.tour-card-enter {
+  animation: tour-card-in 420ms ease-out both;
+}
+
+.assistant-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(234, 179, 8, 0.7) rgba(39, 39, 42, 0.6);
+  scrollbar-gutter: stable;
+}
+
+.assistant-scrollbar::-webkit-scrollbar {
+  width: 12px;
+}
+
+.assistant-scrollbar::-webkit-scrollbar-track {
+  background: rgba(24, 24, 27, 0.95);
+  border-radius: 999px;
+  border: 1px solid rgba(63, 63, 70, 0.55);
+}
+
+.assistant-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(250, 204, 21, 0.92), rgba(234, 179, 8, 0.82));
+  border-radius: 999px;
+  border: 2px solid rgba(24, 24, 27, 0.95);
+  min-height: 44px;
+}
+
+.assistant-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(253, 224, 71, 0.98), rgba(245, 158, 11, 0.88));
+}
+
+.volt-tooltip {
+  position: absolute;
+  z-index: 80;
+  white-space: nowrap;
+  pointer-events: none;
+  border-radius: 999px;
+  border: 1px solid var(--volt-yellow-border);
+  background: linear-gradient(180deg, rgba(38, 24, 5, 0.98), rgba(18, 14, 5, 0.98));
+  padding: 0.35rem 0.65rem;
+  color: #facc15;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(234, 179, 8, 0.08) inset;
+  transition: opacity 160ms ease;
+}
+
+.quick-assistant-trigger {
+  animation: quick-assistant-float 3.2s ease-in-out infinite;
+}
+
+.quick-assistant-trigger-icon {
+  animation: quick-assistant-pulse 1.9s ease-in-out infinite;
+}
+
 .recharts-wrapper:focus,
 .recharts-wrapper:focus-visible,
 .recharts-surface:focus,
@@ -175,12 +231,47 @@ select option:focus {
   }
 }
 
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes quick-assistant-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes quick-assistant-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .metric-icon,
   .metric-icon svg,
   .energy-wave .recharts-area-curve,
   .energy-wave .recharts-area-dot,
-  .energy-wave .recharts-active-dot {
+  .energy-wave .recharts-active-dot,
+  .tour-card-enter,
+  .quick-assistant-trigger,
+  .quick-assistant-trigger-icon {
     animation: none;
   }
 }

@@ -161,7 +161,7 @@ export default function LiveDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle="Live energy usage status" />
+      <PageHeader title="Dashboard" subtitle="Track live energy flow, key metrics, and device insights in one view." />
       {warning && (
         <div className="rounded-3xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] p-4 text-sm text-[var(--volt-yellow)]">
           {warning}
@@ -169,18 +169,20 @@ export default function LiveDashboard() {
       )}
 
       {todayFlowData.length > 0 ? (
-        <LineChartPanel
-          data={todayFlowData}
-          title="Today's Energy Flow"
-          subtitle={`Live status up to ${currentTimeLabel}.`}
-        />
+        <div data-tour="dashboard-flow">
+          <LineChartPanel
+            data={todayFlowData}
+            title="Today's Energy Flow"
+            subtitle={`Live status up to ${currentTimeLabel}.`}
+          />
+        </div>
       ) : (
         <div className="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-10 text-center text-zinc-400">
           No historical energy data available yet.
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <div data-tour="dashboard-metrics" className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           title="Grid Power"
           value={safeData.grid_draw_kw}
@@ -248,7 +250,7 @@ export default function LiveDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div data-tour="dashboard-insights" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <PieChartPanel data={pieData} />
         <TopConsumersTable devices={devicesData} />
       </div>

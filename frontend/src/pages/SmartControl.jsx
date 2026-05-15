@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api/devicesApi";
 import VoltSelect from "../components/VoltSelect";
+import ThemedTooltip from "../components/ThemedTooltip";
 import {
   AirVent,
   CheckCircle2,
@@ -24,8 +25,19 @@ import {
   Trash2,
 } from "lucide-react";
 
-const getDeviceType = (device) => device.type ?? device.name;
-const getDeviceLabel = (device) => `${device.name}${device.location ? ` - ${device.location}` : ""}`;
+const canonicalizeDeviceType = (type) => {
+  if (!type) return type;
+  return type.toLowerCase() === "light" ? "Tube Light" : type;
+};
+
+const canonicalizeDeviceName = (device) => {
+  if (!device?.name) return device?.name;
+  return device.name.replace(/\bLight\b/g, "Tube Light");
+};
+
+const getDeviceType = (device) => canonicalizeDeviceType(device.type ?? device.name);
+const getDeviceLabel = (device) =>
+  `${canonicalizeDeviceName(device)}${device.location ? ` - ${device.location}` : ""}`;
 const emptyForm = { type: "AC", name: "AC 1", location: "Bedroom 1", status: "OFF", power_usage_w: 1500 };
 const statusOptions = [
   { value: "ON", label: "Currently Running" },
@@ -35,8 +47,8 @@ const statusOptions = [
 const householdDefaults = [
   { id: "cooler-1", type: "Cooler", name: "Cooler 1", location: "Living Room", status: "OFF", power_usage_w: 220 },
   { id: "water-heater-1", type: "Water Heater", name: "Water Heater 1", location: "Bathroom", status: "OFF", power_usage_w: 3000 },
-  { id: "light-1", type: "Light", name: "Living Room Light", location: "Living Room", status: "ON", power_usage_w: 18 },
-  { id: "light-2", type: "Light", name: "Bedroom Light", location: "Bedroom 1", status: "OFF", power_usage_w: 18 },
+  { id: "light-1", type: "Tube Light", name: "Living Room Tube Light", location: "Living Room", status: "ON", power_usage_w: 18 },
+  { id: "light-2", type: "Tube Light", name: "Bedroom Tube Light", location: "Bedroom 1", status: "OFF", power_usage_w: 18 },
   { id: "bulb-1", type: "Bulb", name: "Kitchen Bulb", location: "Kitchen", status: "ON", power_usage_w: 12 },
   { id: "tv-1", type: "TV", name: "TV 1", location: "Living Room", status: "OFF", power_usage_w: 120 },
   { id: "laptop-1", type: "Laptop", name: "Laptop Charger", location: "Study", status: "ON", power_usage_w: 65 },
@@ -52,7 +64,7 @@ const deviceTypeConfig = {
   "water heater": { icon: Flame, tone: "text-red-300 bg-red-500/10 border-red-500/20", watts: 3000 },
   fridge: { icon: Refrigerator, tone: "text-lime-300 bg-lime-500/10 border-lime-500/20", watts: 200 },
   "washing machine": { icon: WashingMachine, tone: "text-violet-300 bg-violet-500/10 border-violet-500/20", watts: 500 },
-  light: { icon: Lightbulb, tone: "text-yellow-300 bg-yellow-500/10 border-yellow-500/20", watts: 18 },
+  "tube light": { icon: Lightbulb, tone: "text-yellow-300 bg-yellow-500/10 border-yellow-500/20", watts: 18 },
   bulb: { icon: Lightbulb, tone: "text-yellow-300 bg-yellow-500/10 border-yellow-500/20", watts: 12 },
   tv: { icon: Tv, tone: "text-blue-300 bg-blue-500/10 border-blue-500/20", watts: 120 },
   laptop: { icon: Laptop, tone: "text-indigo-300 bg-indigo-500/10 border-indigo-500/20", watts: 65 },
@@ -86,9 +98,15 @@ const seasonalModes = {
     helper: "Keeps 2 fans and key essentials ON; heavy appliances OFF.",
     icon: Leaf,
   },
+  vacation: {
+    label: "Vacation Mode",
+    helper: "Turns every listed device OFF while the home is away or inactive.",
+    icon: Power,
+    allOff: true,
+  },
 };
 
-const normalizeType = (type) => type.toLowerCase();
+const normalizeType = (type) => canonicalizeDeviceType(type).toLowerCase();
 const getPreferredSelections = (devices) =>
   devices.reduce((selected, device) => {
     const type = getDeviceType(device);
@@ -121,7 +139,7 @@ function getSavingStatus(device, typeIndex) {
   const count = typeIndex[type] ?? 0;
 
   if (type === "fan") return count <= 2 ? "ON" : "OFF";
-  if (type === "light" || type === "bulb") return count <= 2 ? "ON" : "OFF";
+  if (type === "tube light" || type === "bulb") return count <= 2 ? "ON" : "OFF";
   if (["fridge", "laptop", "charger"].includes(type)) return "ON";
   if (["ac", "cooler", "heater", "water heater", "washing machine", "microwave", "cooker", "tv"].includes(type)) return "OFF";
   return Number(device.power_usage_w) <= 75 ? "ON" : "OFF";
@@ -131,7 +149,7 @@ const deviceSections = [
   {
     title: "Daily Essentials",
     helper: "Everyday household devices",
-    types: ["fan", "light", "bulb", "fridge"],
+    types: ["fan", "tube light", "bulb", "fridge"],
   },
   {
     title: "Climate Control",
@@ -236,6 +254,8 @@ export default function SmartControl() {
     const nextDevices = devices.map((device) => {
       const normalizedType = normalizeType(getDeviceType(device));
       typeIndex[normalizedType] = (typeIndex[normalizedType] ?? 0) + 1;
+      if (mode.allOn) return { ...device, status: "ON" };
+      if (mode.allOff) return { ...device, status: "OFF" };
       if (modeKey === "saving") return { ...device, status: getSavingStatus(device, typeIndex) };
       if (mode.on?.includes(normalizedType)) return { ...device, status: "ON" };
       if (mode.off?.includes(normalizedType)) return { ...device, status: "OFF" };
@@ -351,11 +371,11 @@ export default function SmartControl() {
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+          <div data-tour="page-heading">
             <h1 className="font-display text-2xl font-bold text-white">Smart Control</h1>
             <p className="text-zinc-400 mt-1">Manage your home appliances remotely</p>
           </div>
-          <div className="flex gap-3">
+          <div data-tour="device-stats" className="flex gap-3">
             <div className="flex h-20 min-w-[150px] flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900 px-5 shadow-sm">
               <p className="text-xs text-zinc-500 font-medium uppercase">Active Devices</p>
               <p className="text-lg font-bold text-white">{activeCount} / {devices.length}</p>
@@ -423,7 +443,7 @@ export default function SmartControl() {
       ) : null}
 
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2 xl:flex-row xl:items-center xl:justify-between">
+        <div data-tour="device-controls" className="flex flex-col gap-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             {sectionedDeviceGroups.map((section) => (
               <button
@@ -464,7 +484,7 @@ export default function SmartControl() {
         </div>
 
         {selectedSection ? (
-          <section className="rounded-2xl border border-zinc-900">
+          <section data-tour="device-list" className="rounded-2xl border border-zinc-900">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="font-display text-lg font-semibold text-[var(--volt-yellow)]">{selectedSection.title}</h2>
@@ -475,27 +495,31 @@ export default function SmartControl() {
                   {selectedGroups.reduce((sum, [, group]) => sum + group.filter((item) => item.status === "ON").length, 0)} running
                 </p>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPage((value) => Math.max(1, value - 1))}
-                    disabled={currentPage === 1}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 hover:text-white"
-                    title="Previous page"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
+                  <ThemedTooltip label="Previous page">
+                    <button
+                      type="button"
+                      onClick={() => setPage((value) => Math.max(1, value - 1))}
+                      disabled={currentPage === 1}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 hover:text-white"
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                  </ThemedTooltip>
                   <span className="min-w-[58px] text-center text-xs font-bold text-zinc-500">
                     {currentPage} / {totalPages}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                    disabled={currentPage === totalPages}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 hover:text-white"
-                    title="Next page"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
+                  <ThemedTooltip label="Next page">
+                    <button
+                      type="button"
+                      onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                      disabled={currentPage === totalPages}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 hover:text-white"
+                      aria-label="Next page"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </ThemedTooltip>
                 </div>
               </div>
             </div>
@@ -506,6 +530,20 @@ export default function SmartControl() {
                 const isOn = device.status === "ON";
                 const runningCount = group.filter((item) => item.status === "ON").length;
                 const hasRunningUnit = runningCount > 0;
+                const glowClass =
+                  runningCount >= 3
+                    ? "shadow-[0_0_34px_rgba(234,179,8,0.28)]"
+                    : runningCount === 2
+                      ? "shadow-[0_0_26px_rgba(234,179,8,0.22)]"
+                      : runningCount === 1
+                        ? "shadow-[0_0_18px_rgba(234,179,8,0.16)]"
+                        : "shadow-sm";
+                const overlayClass =
+                  runningCount >= 3
+                    ? "bg-[linear-gradient(135deg,rgba(234,179,8,0.16),rgba(234,179,8,0.06)_45%,transparent_72%)]"
+                    : runningCount === 2
+                      ? "bg-[linear-gradient(135deg,rgba(234,179,8,0.13),rgba(234,179,8,0.05)_45%,transparent_72%)]"
+                      : "bg-[linear-gradient(135deg,rgba(234,179,8,0.10),rgba(234,179,8,0.03)_45%,transparent_70%)]";
                 const config = getTypeConfig(type);
                 const DeviceIcon = config.icon;
 
@@ -516,7 +554,7 @@ export default function SmartControl() {
                       openUnitMenu === type ? "z-40 overflow-visible" : "overflow-hidden"
                     } ${
                       hasRunningUnit 
-                        ? 'bg-zinc-900 text-white border-[var(--volt-yellow-border)] shadow-[0_0_22px_var(--volt-yellow-glow)]' 
+                        ? `bg-zinc-900 text-white border-[var(--volt-yellow-border)] ${glowClass}` 
                         : 'bg-zinc-900 text-white border-zinc-800 shadow-sm hover:border-[var(--volt-yellow-border)]'
                     }`}
                   >
@@ -530,17 +568,19 @@ export default function SmartControl() {
                           <p className="text-xs font-semibold text-zinc-500">{runningCount} / {group.length} running</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => toggleDevice(device.id, device.status)}
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
-                          isOn 
-                            ? 'bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)] hover:bg-[rgba(234,179,8,0.22)]' 
-                            : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
-                        }`}
-                        title="Toggle selected unit"
-                      >
-                        <Power size={21} className={isOn ? 'stroke-[2.5px]' : ''} />
-                      </button>
+                      <ThemedTooltip label="Toggle selected unit">
+                        <button
+                          onClick={() => toggleDevice(device.id, device.status)}
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
+                            isOn 
+                              ? 'bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)] hover:bg-[rgba(234,179,8,0.22)]' 
+                              : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
+                          }`}
+                          aria-label="Toggle selected unit"
+                        >
+                          <Power size={21} className={isOn ? 'stroke-[2.5px]' : ''} />
+                        </button>
+                      </ThemedTooltip>
                     </div>
 
                     {group.length > 1 ? (
@@ -607,25 +647,29 @@ export default function SmartControl() {
                         {hasRunningUnit ? `${runningCount} On` : 'Off'}
                       </span>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => beginEdit(device)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:text-white"
-                          title="Edit selected unit"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={() => removeDevice(device)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
-                          title="Remove selected unit"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <ThemedTooltip label="Edit selected unit">
+                          <button
+                            onClick={() => beginEdit(device)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:text-white"
+                            aria-label="Edit selected unit"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        </ThemedTooltip>
+                        <ThemedTooltip label="Remove selected unit">
+                          <button
+                            onClick={() => removeDevice(device)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
+                            aria-label="Remove selected unit"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </ThemedTooltip>
                       </div>
                     </div>
 
                     {hasRunningUnit && (
-                      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(234,179,8,0.10),rgba(234,179,8,0.03)_45%,transparent_70%)]"></div>
+                      <div className={`pointer-events-none absolute inset-0 ${overlayClass}`}></div>
                     )}
                   </div>
                 );

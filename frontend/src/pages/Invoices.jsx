@@ -5,6 +5,7 @@ import PageHeader from "../components/PageHeader";
 import BillingSummary from "../features/billing/BillingSummary";
 import BudgetOverview from "../features/billing/BudgetOverview";
 import InvoiceHistory from "../features/billing/InvoiceHistory";
+import { downloadInvoicePdf } from "../utils/invoicePdf";
 
 const fallbackBilling = {
   current_balance: 1850,
@@ -61,7 +62,7 @@ export default function Invoices() {
       .catch((err) => {
         if (!cancelled) {
           setData(fallbackBilling);
-          setWarning("Using local fallback billing data because the backend is unreachable.");
+          setWarning("Showing a billing snapshot right now.");
           setError(err.message || "Unable to load billing summary.");
         }
       })
@@ -102,11 +103,50 @@ export default function Invoices() {
   const { netProjectedBill, solarCredit, solarSurplusKwh } = getSolarAdjustedBilling(safeData);
   const { isPaymentDay, nextPaymentDate } = getPaymentWindow();
   const isOverBudget = netProjectedBill > safeData.budget_limit;
+  const budgetHelper = solarCredit > 0
+    ? {
+        title: "Solar Is Keeping You In Budget",
+        message: `Your payable bill is Rs.${netProjectedBill}, within the Rs.${safeData.budget_limit} budget.`,
+      }
+    : {
+        title: "Grid Usage Is Keeping You In Budget",
+        message: `Your payable bill is Rs.${netProjectedBill}, within the Rs.${safeData.budget_limit} budget because grid usage is controlled.`,
+      };
   const invoices = [
-    { month: "April 2026", amount: 2450, status: "Paid" },
-    { month: "March 2026", amount: 2600, status: "Paid" },
-    { month: "February 2026", amount: 2320, status: "Paid" },
+    { month: "April 2026", amount: 2450, status: "Paid", invoiceNumber: "INV-1042" },
+    { month: "March 2026", amount: 2600, status: "Paid", invoiceNumber: "INV-1041" },
+    { month: "February 2026", amount: 2320, status: "Paid", invoiceNumber: "INV-1040" },
   ];
+
+  const buildInvoicePayload = (invoice) => ({
+    invoiceNumber: invoice.invoiceNumber,
+    month: invoice.month,
+    status: invoice.status,
+    generatedBill: safeData.current_balance,
+    payableBill: netProjectedBill,
+    budgetLimit: safeData.budget_limit,
+    gridUsage: safeData.current_grid_data_usage,
+    solarUsage: safeData.solar_energy_usage,
+    solarSavings: solarCredit,
+  });
+
+  const handleDownloadCurrentInvoice = () => {
+    downloadInvoicePdf({
+      ...buildInvoicePayload({
+        invoiceNumber: "INV-CURRENT",
+        month: "Current Month",
+        status: isOverBudget ? "Attention" : "In Budget",
+      }),
+    });
+  };
+
+  const handleDownloadHistoryInvoice = (invoice) => {
+    downloadInvoicePdf({
+      ...buildInvoicePayload(invoice),
+      generatedBill: invoice.amount,
+      payableBill: invoice.amount,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -116,22 +156,22 @@ export default function Invoices() {
       />
 
       {isOverBudget ? (
-        <div className="bg-red-950/30 border-l-4 border-red-500 p-4 rounded-r-xl flex items-start gap-3 shadow-sm">
+        <div data-tour="billing-alert" className="bg-red-950/30 border-l-4 border-red-500 p-4 rounded-r-xl flex items-start gap-3 shadow-sm">
           <AlertTriangle className="text-red-500 shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-red-400">Bill Is Still Over Budget</h3>
             <p className="text-red-300 text-sm mt-1">
-              Your payable bill is ₹{netProjectedBill}, which is above the ₹{safeData.budget_limit} budget.
+              Your payable bill is INR {netProjectedBill}, which is above the INR {safeData.budget_limit} budget.
             </p>
           </div>
         </div>
       ) : (
-        <div className="bg-emerald-950/25 border-l-4 border-emerald-500 p-4 rounded-r-xl flex items-start gap-3 shadow-sm">
+        <div data-tour="billing-alert" className="bg-emerald-950/25 border-l-4 border-emerald-500 p-4 rounded-r-xl flex items-start gap-3 shadow-sm">
           <Sun className="text-emerald-400 shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-emerald-300">Solar Is Keeping You In Budget</h3>
+            <h3 className="font-semibold text-emerald-300">{budgetHelper.title}</h3>
             <p className="text-emerald-100/80 text-sm mt-1">
-              Your payable bill is ₹{netProjectedBill}, within the ₹{safeData.budget_limit} budget.
+              {budgetHelper.message}
               {solarSurplusKwh > 0 ? ` Solar is ahead by ${solarSurplusKwh} kWh.` : ""}
             </p>
           </div>
@@ -144,7 +184,7 @@ export default function Invoices() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div data-tour="billing-panels" className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:col-span-2">
           <BillingSummary
             balance={safeData.current_balance}
@@ -152,6 +192,7 @@ export default function Invoices() {
             solarUsage={safeData.solar_energy_usage}
             gridBill={safeData.projected_bill}
             solarSavings={solarCredit}
+            onDownloadCurrentInvoice={handleDownloadCurrentInvoice}
           />
           <BudgetOverview
             projectedBill={safeData.projected_bill}
@@ -163,8 +204,11 @@ export default function Invoices() {
             nextPaymentDate={nextPaymentDate}
           />
         </div>
-        <InvoiceHistory invoices={invoices} />
+        <InvoiceHistory invoices={invoices} onDownload={handleDownloadHistoryInvoice} />
       </div>
     </div>
   );
 }
+
+
+

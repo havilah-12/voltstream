@@ -45,11 +45,11 @@ function EnergyTooltip({ active, payload, label }) {
   );
 }
 
-export default function BarChartPanel({ data, className = "" }) {
+export default function BarChartPanel({ data, className = "", headerAction = null }) {
   const hasData = Array.isArray(data) && data.length > 0;
 
   return (
-    <ChartCard title="Energy Consumption vs Generation" className={className}>
+    <ChartCard title="Energy Consumption vs Generation" headerAction={headerAction} className={className}>
       <div className="flex-1 min-h-[320px]">
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
