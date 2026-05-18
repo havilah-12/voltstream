@@ -87,30 +87,6 @@ def _get_collection():
     return collection
 
 
-def get_chroma_status() -> dict:
-    settings = get_settings()
-    persist_path = Path(settings.chroma_path)
-    if not persist_path.is_absolute():
-        persist_path = APP_ROOT / persist_path
-
-    status = {
-        "configured": bool(settings.gemini_api_key),
-        "collection_name": settings.chroma_collection_name,
-        "persist_path": str(persist_path),
-        "document_path": str(KNOWLEDGE_PATH),
-        "chunk_count": len(_chunk_document(_load_document())) if KNOWLEDGE_PATH.exists() else 0,
-        "available": False,
-    }
-
-    try:
-        collection = _get_collection()
-        status["available"] = collection is not None
-    except Exception as exc:
-        status["error"] = str(exc)
-
-    return status
-
-
 def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
     collection = _get_collection()
     if collection is None:

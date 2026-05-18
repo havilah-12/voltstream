@@ -2,54 +2,16 @@ import logging
 import re
 from pathlib import Path
 
-from config import get_settings
-from data.mock_data import mock_db
-from schemas.chat import ChatAttachment, ChatRequest, ChatResponse
+from db import get_connection
+from schemas.chat import ChatRequest, ChatResponse
+from services.chat_service import _is_platform_question
 from services.chroma_service import retrieve_chroma_chunks
+from services.gemini_service import ask_gemini
 
 logger = logging.getLogger("voltstream")
 
 KNOWLEDGE_PATH = Path(__file__).resolve().parent.parent / "data" / "energy_guide.txt"
 OUT_OF_SCOPE_ANSWER = "I don't have that information."
-CHAT_FALLBACK_ANSWER = (
-    "I can still help with general questions about energy, solar savings, grid usage, device usage, and simple terms. "
-    "Try asking your question in a slightly different way, and I will do my best to explain it clearly."
-)
-CHAT_PROMPT_TEMPLATE = """You are the VoltStream Chat Bot for a household smart energy monitoring platform.
-
-Answer style:
-- Be friendly, clear, and concise.
-- Answer normal conversational questions naturally, like a direct Gemini assistant.
-- Focus on general energy questions, solar usage, grid usage, bill savings, household devices, and simple explanations of energy terms.
-- Use general knowledge for normal conversational help and energy concepts.
-- When explaining abbreviations, include the full forms first when useful.
-- For basic concept questions, answer the concept first in plain language and avoid sounding like internal documentation.
-- For basic energy concept questions, do not mention VoltStream at all unless the user explicitly asks how the concept appears in VoltStream.
-- If the user asks a VoltStream platform-specific question about pages, navigation, where to find a feature, or how a specific screen works, briefly guide them to use the Q&A Bot for platform-specific answers.
-- If the user asks something broader or slightly outside the main energy topic, still reply naturally and helpfully instead of refusing.
-- Do not say "I don't have that information." in Chat Bot mode. If you are unsure, give the best helpful explanation you can or gently ask the user to rephrase.
-
-Examples of the desired style:
-User: What is the difference between kW and kWh?
-Assistant: kW means kilowatt, which measures power at a specific moment. kWh means kilowatt-hour, which measures how much energy is used or generated over time.
-
-User: What is solar surplus?
-Assistant: Solar surplus is extra solar power left over after your home's energy needs are already covered. Depending on the setup, that extra energy may be exported back to the grid.
-
-User: Do you know about CO2 impact?
-Assistant: Yes. CO2 impact means the environmental effect of your energy usage, especially how much carbon dioxide emissions can be reduced by cleaner energy choices. In VoltStream, you can see this as eco impact, which helps show the environmental benefit of things like using solar power.
-
-User: Do you know about energy efficiency?
-Assistant: Yes. Energy efficiency means using less energy to do the same work, so waste is reduced and bills stay lower. In VoltStream, you can understand this better by tracking grid usage, solar usage, device load, and savings across the dashboard, billing, and usage history views.
-
-User: What can you help me with here?
-Assistant: I can help with general energy questions, solar savings, grid usage, device usage, energy terms, and simple explanations related to home energy.
-
-User question:
-{question}
-
-Final answer:"""
-
 QA_PROMPT_TEMPLATE = """You are the VoltStream Q&A Bot for a household smart energy monitoring platform.
 
 Answer style:
@@ -76,18 +38,22 @@ Assistant: kW means kilowatt, which is live power at a moment in time. kWh means
 User: Do you know about CO2 impact?
 Assistant: CO2 impact means the environmental effect of your energy usage, especially how much carbon dioxide emissions can be reduced by using cleaner energy. In VoltStream, this appears as eco impact on the Dashboard to help you understand the environmental benefit of choices like using solar power.
 
+User: What else do you know about this platform?
+Assistant: VoltStream is a household smart energy monitoring platform. It brings together live energy flow, usage history, smart device control, billing insights, and assistant help in one place so users can understand and manage home energy better.
+
 User question:
 {question}
 
 VoltStream context:
 {context}
 
-User attachment context:
-{attachment_context}
-
 Final answer:"""
 ENERGY_KEYWORDS = {
     "voltstream",
+    "platform",
+    "work",
+    "works",
+    "working",
     "energy",
     "power",
     "grid",
@@ -112,6 +78,8 @@ ENERGY_KEYWORDS = {
     "smart",
     "control",
     "assistant",
+    "app",
+    "website",
     "page",
     "navigation",
     "navigate",
@@ -172,26 +140,6 @@ SMALL_TALK_PATTERNS = (
     ({"thanks"}, "You're welcome. What would you like to check next?"),
 )
 LIVE_USAGE_TERMS = {"right", "now", "current", "live", "status"}
-PLATFORM_TERMS = {
-    "page",
-    "pages",
-    "screen",
-    "screens",
-    "dashboard",
-    "billing",
-    "invoice",
-    "invoices",
-    "smart",
-    "control",
-    "assistant",
-    "navigate",
-    "navigation",
-    "open",
-    "where",
-    "find",
-    "feature",
-}
-
 
 def _tokenize(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", text.lower()))
@@ -209,11 +157,11 @@ def _load_document() -> str:
     return KNOWLEDGE_PATH.read_text(encoding="utf-8")
 
 
-def _is_platform_question(question: str) -> bool:
+def _is_platform_overview_question(question: str) -> bool:
     question_terms = _tokenize(question)
-    asks_where_to_go = "open" in question_terms or "page" in question_terms or "navigate" in question_terms
-    references_platform = bool(question_terms.intersection(PLATFORM_TERMS))
-    return asks_where_to_go or references_platform
+    mentions_platform = bool(question_terms.intersection({"platform", "voltstream", "app", "website"}))
+    broad_terms = {"know", "about", "work", "works", "working", "overview", "tell", "else"}
+    return mentions_platform and bool(question_terms.intersection(broad_terms))
 
 
 def _chunk_document(text: str) -> list[str]:
@@ -253,6 +201,42 @@ def _local_grounded_answer(question: str, chunks: list[str]) -> str:
 
     if not chunks:
         return OUT_OF_SCOPE_ANSWER
+
+    if _is_platform_overview_question(question):
+        return (
+            "VoltStream is a household smart energy monitoring platform. It helps you track live energy flow, "
+            "compare grid and solar usage, manage home devices, understand bill savings, and see eco impact in one place. "
+            "You can use it to check live power on the dashboard, review usage history, control devices, and understand your billing better."
+        )
+
+    if "dashboard" in question_terms and ("explain" in question_terms or "simple" in question_terms):
+        return (
+            "The Dashboard is the main overview page in VoltStream. It gives you a quick live picture of your home energy, "
+            "including grid power, solar power, energy balance, bill savings, eco impact, and your top energy consumers."
+        )
+
+    if ("control" in question_terms and "device" in question_terms) or (
+        "open" in question_terms and {"page", "devices"}.intersection(question_terms)
+    ):
+        return (
+            "Open the Smart Control page. That is where you can see your household devices, check whether they are ON or OFF, "
+            "view their load, and manage them by room or device type."
+        )
+
+    if "billing" in question_terms and ("show" in question_terms or "page" in question_terms):
+        return (
+            "Open the Billing page to check generated bill, payable bill, solar credit, budget status, and recent invoices. "
+            "It helps you understand how solar savings are affecting what you need to pay."
+        )
+
+    if _match_all(question_terms, "usage", "history") or (
+        "history" in question_terms and ("check" in question_terms or "see" in question_terms or "view" in question_terms)
+    ):
+        return (
+            "You can check usage history on the Usage History page. It shows your past grid usage and solar generation, "
+            "and you can switch between daily, weekly, and monthly views to compare trends over time. "
+            "If you want a quick explanation of what changed, you can also open the AI Summary on that page."
+        )
 
     if _match_all(question_terms, "kw", "kwh"):
         return (
@@ -365,21 +349,16 @@ def _local_grounded_answer(question: str, chunks: list[str]) -> str:
     return " ".join(answer_sentences)
 
 
-def _attachment_chunks(attachments: list[ChatAttachment]) -> list[str]:
-    chunks = []
-    for attachment in attachments:
-        chunks.append(f"Attachment: {attachment.name}\n{attachment.content}")
-    return chunks
-
-
-def _attachment_context_text(attachments: list[ChatAttachment]) -> str:
-    if not attachments:
-        return "No user attachments provided."
-    return "\n\n".join(_attachment_chunks(attachments))
-
-
 def _live_usage_answer() -> str:
-    live = mock_db["dashboard_live"]
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT grid_draw_kw, solar_generation_kw, net_usage_kw
+            FROM dashboard_live
+            WHERE id = 1
+            """
+        ).fetchone()
+    live = dict(row) if row else {}
     grid = NumberLike(live.get("grid_draw_kw"))
     solar = NumberLike(live.get("solar_generation_kw"))
     net = NumberLike(live.get("net_usage_kw"))
@@ -393,86 +372,11 @@ def _live_usage_answer() -> str:
     return f"Right now your home is drawing {grid:.1f} kW from the grid and solar is generating {solar:.1f} kW. {balance}"
 
 
-def _local_chat_answer(question: str) -> str:
-    lowered = question.lower()
-    question_terms = _content_terms(question)
-
-    if _match_all(question_terms, "kw", "kwh"):
-        return (
-            "kW means kilowatt, which measures power at a specific moment. "
-            "kWh means kilowatt-hour, which measures how much energy is used or generated over time."
-        )
-
-    if "surplus" in lowered:
-        return (
-            "Solar surplus is the extra solar power left over after your home has already used what it needs. "
-            "Depending on your setup, that extra energy may be sent back to the grid or counted as excess generation."
-        )
-
-    if "solar" in lowered and "bill" in lowered:
-        return (
-            "Solar reduces your bill by letting your home use solar energy first instead of buying that same energy from the grid. "
-            "The more of your home usage covered by solar, the less electricity you need to purchase."
-        )
-
-    if "co2" in question_terms or _match_all(question_terms, "eco", "impact"):
-        return (
-            "CO2 impact means the environmental effect of your energy usage, especially how much carbon dioxide emissions can be reduced by cleaner energy choices like solar power."
-        )
-
-    if "efficiency" in lowered:
-        return (
-            "Energy efficiency means using less energy to do the same work, so waste is reduced and bills stay lower."
-        )
-
-    if "grid" in lowered and "power" in lowered:
-        return (
-            "Grid power is the electricity your home is currently taking from the main electricity grid."
-        )
-
-    if "solar" in lowered:
-        return (
-            "Solar power is the electricity generated by your solar panels and made available for home use."
-        )
-
-    return CHAT_FALLBACK_ANSWER
-
-
 def NumberLike(value) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-def _ask_gemini(
-    question: str,
-    chunks: list[str],
-    attachments: list[ChatAttachment] | None = None,
-    *,
-    mode: str = "qa",
-) -> str | None:
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        return None
-
-    try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
-        prompt_template = QA_PROMPT_TEMPLATE if mode == "qa" else CHAT_PROMPT_TEMPLATE
-        prompt = prompt_template.format(
-            out_of_scope_answer=OUT_OF_SCOPE_ANSWER,
-            question=question,
-            context=chr(10).join(chunks),
-            attachment_context=_attachment_context_text(attachments or []),
-        )
-        response = model.generate_content(prompt)
-        return (response.text or "").strip() or None
-    except Exception as exc:
-        logger.warning("Gemini request failed, using local grounded answer: %s", exc)
-        return None
 
 
 def _shared_small_talk_or_live_response(request: ChatRequest) -> ChatResponse | None:
@@ -503,37 +407,13 @@ def _shared_small_talk_or_live_response(request: ChatRequest) -> ChatResponse | 
 
     return None
 
-
-def answer_chat(request: ChatRequest) -> ChatResponse:
-    if _is_platform_question(request.question):
-        return ChatResponse(
-            answer=(
-                "For VoltStream page or feature questions, please use the Q&A Bot. "
-                "It is the better place for platform-specific guidance about screens, navigation, billing views, and controls."
-            ),
-            sources=[],
-            used_gemini=False,
-        )
-
-    gemini_answer = _ask_gemini(request.question, [], [], mode="chat")
-    if gemini_answer:
-        return ChatResponse(answer=gemini_answer, sources=[], used_gemini=True)
-
-    return ChatResponse(
-        answer=_local_chat_answer(request.question),
-        sources=[],
-        used_gemini=False,
-    )
-
-
 def answer_qa(request: ChatRequest) -> ChatResponse:
     shortcut_response = _shared_small_talk_or_live_response(request)
     if shortcut_response:
         return shortcut_response
 
     chunks = retrieve_chunks(request.question)
-    attachment_chunks = _attachment_chunks(request.attachments)
-    context_chunks = [*attachment_chunks, *chunks]
+    context_chunks = chunks
 
     if not _is_platform_question(request.question) and not context_chunks:
         return ChatResponse(
@@ -548,7 +428,12 @@ def answer_qa(request: ChatRequest) -> ChatResponse:
     if not context_chunks:
         return ChatResponse(answer=OUT_OF_SCOPE_ANSWER, sources=[], used_gemini=False)
 
-    gemini_answer = _ask_gemini(request.question, context_chunks, request.attachments, mode="qa")
+    gemini_answer = ask_gemini(
+        request.question,
+        context_chunks,
+        QA_PROMPT_TEMPLATE,
+        out_of_scope_answer=OUT_OF_SCOPE_ANSWER,
+    )
     if gemini_answer:
         return ChatResponse(answer=gemini_answer, sources=context_chunks, used_gemini=True)
 

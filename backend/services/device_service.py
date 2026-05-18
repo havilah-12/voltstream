@@ -1,41 +1,107 @@
 from uuid import uuid4
 
-from data.mock_data import mock_db
+from db import get_connection
 from schemas.device import DevicePayload, DeviceStatusUpdate
 
 
 def list_devices():
-    return mock_db["devices"]
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, type, name, location, status, power_usage_w
+            FROM devices
+            ORDER BY id
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def create_device(device: DevicePayload):
     slug = device.type.lower().replace(" ", "-")
     new_device = device.model_dump()
     new_device["id"] = f"{slug}-{uuid4().hex[:6]}"
-    mock_db["devices"].append(new_device)
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO devices (id, type, name, location, status, power_usage_w)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                new_device["id"],
+                new_device["type"],
+                new_device["name"],
+                new_device.get("location", ""),
+                new_device.get("status", "OFF"),
+                new_device.get("power_usage_w", 0),
+            ),
+        )
+        connection.commit()
     return new_device
 
 
 def update_device_status(device_id: str, update: DeviceStatusUpdate):
-    for device in mock_db["devices"]:
-        if device["id"] == device_id:
-            device["status"] = update.status
-            return device
-    return None
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE devices
+            SET status = ?
+            WHERE id = ?
+            """,
+            (update.status, device_id),
+        )
+        if cursor.rowcount == 0:
+            return None
+        connection.commit()
+        row = connection.execute(
+            """
+            SELECT id, type, name, location, status, power_usage_w
+            FROM devices
+            WHERE id = ?
+            """,
+            (device_id,),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def update_device(device_id: str, update: DevicePayload):
-    for index, device in enumerate(mock_db["devices"]):
-        if device["id"] == device_id:
-            updated = update.model_dump()
-            updated["id"] = device_id
-            mock_db["devices"][index] = updated
-            return updated
-    return None
+    updated = update.model_dump()
+    updated["id"] = device_id
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE devices
+            SET type = ?, name = ?, location = ?, status = ?, power_usage_w = ?
+            WHERE id = ?
+            """,
+            (
+                updated["type"],
+                updated["name"],
+                updated.get("location", ""),
+                updated.get("status", "OFF"),
+                updated.get("power_usage_w", 0),
+                device_id,
+            ),
+        )
+        if cursor.rowcount == 0:
+            return None
+        connection.commit()
+    return updated
 
 
 def delete_device(device_id: str):
-    for index, device in enumerate(mock_db["devices"]):
-        if device["id"] == device_id:
-            return mock_db["devices"].pop(index)
-    return None
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id, type, name, location, status, power_usage_w
+            FROM devices
+            WHERE id = ?
+            """,
+            (device_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        connection.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        connection.commit()
+    return dict(row)

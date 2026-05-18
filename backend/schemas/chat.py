@@ -1,14 +1,17 @@
 from pydantic import BaseModel, Field
 
 
-class ChatAttachment(BaseModel):
-    name: str
-    content: str
-
-
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=2, description="User question about energy, solar, billing, or VoltStream")
-    attachments: list[ChatAttachment] = []
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"question": "How does solar reduce my bill?"},
+                {"question": "Explain the dashboard in simple terms."},
+            ]
+        }
+    }
 
 
 class ChatResponse(BaseModel):
@@ -16,12 +19,16 @@ class ChatResponse(BaseModel):
     sources: list[str] = []
     used_gemini: bool = False
 
-
-class ChatStatusResponse(BaseModel):
-    configured: bool
-    available: bool
-    collection_name: str
-    persist_path: str
-    document_path: str
-    chunk_count: int
-    error: str | None = None
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "answer": (
+                    "Solar panels generate electricity from sunlight, so your home can use that energy first "
+                    "instead of buying the same amount from the grid. That lowers the amount you pay to the "
+                    "utility company, and any extra solar power may also earn credits depending on your setup."
+                ),
+                "sources": [],
+                "used_gemini": True,
+            }
+        }
+    }

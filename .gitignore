@@ -1,7 +1,7 @@
 .firebase/
 __pycache__/
 *.pyc
-backend/venv/
+backend/venv*/
 .env
 .env.*
 !.env.example
@@ -24,3 +24,6 @@ chroma/
 chroma_db/
 .chroma/
 backend/chroma_data/
+backend/*.log
+backend/*.out.log
+backend/*.err.log

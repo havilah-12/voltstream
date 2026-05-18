@@ -1,5 +1,6 @@
 import logging
 
+from db import initialize_database
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers import analytics, billing, chat, dashboard, devices
@@ -47,3 +48,8 @@ def root():
 
 configure_middleware(app)
 register_routes(app)
+
+
+@app.on_event("startup")
+def startup() -> None:
+    initialize_database()

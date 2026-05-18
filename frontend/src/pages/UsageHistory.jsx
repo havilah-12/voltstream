@@ -4,11 +4,21 @@ import { fetchBillingSummary } from "../api/billingApi";
 import { fetchLiveDashboard } from "../api/dashboardApi";
 import { fetchDevices } from "../api/devicesApi";
 import { generateUsageInsights } from "../api/insightsApi";
-import { BarChart3, CalendarClock, Leaf, Sun } from "lucide-react";
+import { BarChart3, CalendarClock, IndianRupee, Leaf, Sun } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import AiUsageSummaryModal, { AiUsageSummaryButton } from "../features/history/AiUsageSummary";
 import PeriodToggle from "../features/history/PeriodToggle";
 import BarChartPanel from "../features/history/BarChartPanel";
+
+function getBillOutlook(summary, periodGridUsage, periodSolarUsage) {
+  const gridUsage = Number(summary?.current_grid_data_usage) || 0;
+  const projectedBill = Number(summary?.projected_bill) || 0;
+  const gridUnitRate = gridUsage > 0 ? projectedBill / gridUsage : 0;
+  const grossBill = periodGridUsage * gridUnitRate;
+  const solarCredit = periodSolarUsage * gridUnitRate;
+
+  return Math.max(grossBill - solarCredit, 0);
+}
 
 export default function UsageHistory() {
   const [period, setPeriod] = useState("daily");
@@ -88,6 +98,12 @@ export default function UsageHistory() {
     (peak, item) => (Number(item.grid ?? 0) > Number(peak.grid ?? 0) ? item : peak),
     data[0] ?? {}
   );
+  const billOutlook = getBillOutlook(billing, totalGrid, totalSolar);
+  const billOutlookLabel = {
+    daily: "Average daily bill",
+    weekly: "Average weekly bill",
+    monthly: "Average monthly bill",
+  }[period];
 
   return (
     <div className="space-y-6">
@@ -102,7 +118,7 @@ export default function UsageHistory() {
       </div>
 
       {!loading && !error && data.length > 0 ? (
-        <section data-tour="history-summary" className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <section data-tour="history-summary" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300 ring-1 ring-violet-500/20">
@@ -132,6 +148,16 @@ export default function UsageHistory() {
             </div>
             <p className="mt-2 text-2xl font-bold text-emerald-300">{solarCoverage}%</p>
             <p className="mt-1 text-sm text-zinc-500">How much of your usage solar helped cover</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)]">
+                <IndianRupee size={22} />
+              </span>
+              <p className="font-display text-lg font-semibold text-[var(--volt-yellow)]">Bill Outlook</p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-white">₹{billOutlook.toFixed(0)}</p>
+            <p className="mt-1 text-sm text-zinc-500">{billOutlookLabel}</p>
           </div>
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
             <div className="mb-4 flex items-center gap-3">

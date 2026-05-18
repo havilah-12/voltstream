@@ -120,7 +120,6 @@ If `GEMINI_API_KEY` is not set, the bot falls back to grounded local answers fro
 - `GET /api/v1/billing/summary` - billing summary
 - `POST /api/v1/chat` - conversational Chat Bot endpoint for VoltStream help and assistant replies
 - `POST /api/v1/qa` - grounded Q&A Bot endpoint using Chroma retrieval and optional file attachments
-- `GET /api/v1/chat/status` - Chroma/Gemini readiness status
 
 ## Frontend Routes
 
