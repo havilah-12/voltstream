@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
 const AUTH_STORAGE_KEY = "voltstream_user";
+const TOUR_PAGES = ["/", "/analytics", "/devices", "/billing", "/chat"];
 const AuthContext = createContext(null);
 
 function readStoredUser() {
@@ -19,6 +20,18 @@ export function AuthProvider({ children }) {
     const saveUser = (nextUser) => {
       window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
       setUser(nextUser);
+    };
+
+    const updateSeenTours = (path) => {
+      if (!user) return;
+      const seenTours = { ...(user.seenTours ?? {}), [path]: true };
+      const hasFinishedAllTours = TOUR_PAGES.every((tourPath) => seenTours[tourPath]);
+      saveUser({
+        ...user,
+        seenTours,
+        hasSeenIntro: hasFinishedAllTours,
+        tourPending: !hasFinishedAllTours,
+      });
     };
 
     return {
@@ -49,19 +62,10 @@ export function AuthProvider({ children }) {
         saveUser({ ...user, hasSeenIntro: true });
       },
       completePageTour: (path) => {
-        if (!user) return;
-        const seenTours = { ...(user.seenTours ?? {}), [path]: true };
-        const hasFinishedAllTours = Object.keys(seenTours).length >= 5;
-        saveUser({
-          ...user,
-          seenTours,
-          hasSeenIntro: hasFinishedAllTours,
-          tourPending: !hasFinishedAllTours,
-        });
+        updateSeenTours(path);
       },
-      dismissTour: () => {
-        if (!user) return;
-        saveUser({ ...user, hasSeenIntro: true, tourPending: false, tourDismissed: true });
+      dismissTour: (path) => {
+        updateSeenTours(path);
       },
       logout: () => {
         window.localStorage.removeItem(AUTH_STORAGE_KEY);

@@ -166,9 +166,7 @@ export default function GuidedTour() {
   const [targetRect, setTargetRect] = useState(null);
   const hasSeenCurrentPage = Boolean(user?.seenTours?.[location.pathname]);
   const isTourPending = user?.tourPending ?? (user?.hasSeenIntro === false);
-  const shouldShow = Boolean(
-    user && isTourPending && !user.tourDismissed && !hasSeenCurrentPage
-  );
+  const shouldShow = Boolean(user && isTourPending && !hasSeenCurrentPage);
   const steps = useMemo(
     () => [
       pageIntroSteps[location.pathname] ?? pageIntroSteps["/"],
@@ -187,6 +185,7 @@ export default function GuidedTour() {
     if (!shouldShow || !step) return undefined;
 
     let frameId;
+    let timeoutId;
     const updateRect = () => {
       const target = document.querySelector(`[data-tour="${step.target}"]`);
       if (!target) {
@@ -194,7 +193,7 @@ export default function GuidedTour() {
         return;
       }
 
-      target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      target.scrollIntoView({ behavior: stepIndex === 0 ? "auto" : "smooth", block: "center", inline: "center" });
       frameId = window.requestAnimationFrame(() => {
         const rect = target.getBoundingClientRect();
         setTargetRect({
@@ -207,17 +206,18 @@ export default function GuidedTour() {
       });
     };
 
-    const timer = window.setTimeout(updateRect, 160);
+    updateRect();
+    timeoutId = window.setTimeout(updateRect, stepIndex === 0 ? 40 : 120);
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
 
     return () => {
-      window.clearTimeout(timer);
+      window.clearTimeout(timeoutId);
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
-  }, [shouldShow, step]);
+  }, [shouldShow, step, stepIndex]);
 
   if (!shouldShow || !step) return null;
 
@@ -299,7 +299,7 @@ export default function GuidedTour() {
           </div>
           <button
             type="button"
-            onClick={dismissTour}
+            onClick={() => dismissTour(location.pathname)}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800 text-zinc-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
             aria-label="Skip guided tour"
           >
@@ -320,7 +320,7 @@ export default function GuidedTour() {
           </button>
           <button
             type="button"
-            onClick={dismissTour}
+            onClick={() => dismissTour(location.pathname)}
             className="h-10 rounded-xl px-4 text-sm font-bold text-zinc-400 transition-colors hover:text-white"
           >
             Skip tour

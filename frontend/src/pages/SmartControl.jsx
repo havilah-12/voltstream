@@ -495,7 +495,7 @@ export default function SmartControl() {
                   {selectedGroups.reduce((sum, [, group]) => sum + group.filter((item) => item.status === "ON").length, 0)} running
                 </p>
                 <div className="flex items-center gap-2">
-                  <ThemedTooltip label="Previous page">
+                  <ThemedTooltip label="Previous">
                     <button
                       type="button"
                       onClick={() => setPage((value) => Math.max(1, value - 1))}
@@ -509,7 +509,7 @@ export default function SmartControl() {
                   <span className="min-w-[58px] text-center text-xs font-bold text-zinc-500">
                     {currentPage} / {totalPages}
                   </span>
-                  <ThemedTooltip label="Next page">
+                  <ThemedTooltip label="Next">
                     <button
                       type="button"
                       onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
@@ -550,15 +550,15 @@ export default function SmartControl() {
                 return (
                   <div 
                     key={type} 
-                    className={`relative rounded-2xl p-4 border transition-all duration-300 ${
-                      openUnitMenu === type ? "z-40 overflow-visible" : "overflow-hidden"
+                    className={`relative flex h-full min-h-[340px] flex-col rounded-2xl p-4 border transition-all duration-300 ${
+                      openUnitMenu === type ? "z-40 overflow-visible" : "overflow-visible"
                     } ${
                       hasRunningUnit 
                         ? `bg-zinc-900 text-white border-[var(--volt-yellow-border)] ${glowClass}` 
                         : 'bg-zinc-900 text-white border-zinc-800 shadow-sm hover:border-[var(--volt-yellow-border)]'
                     }`}
                   >
-                    <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="relative z-10 mb-4 flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${config.tone}`}>
                           <DeviceIcon size={22} />
@@ -568,7 +568,7 @@ export default function SmartControl() {
                           <p className="text-xs font-semibold text-zinc-500">{runningCount} / {group.length} running</p>
                         </div>
                       </div>
-                      <ThemedTooltip label="Toggle selected unit">
+                      <ThemedTooltip label="Toggle unit">
                         <button
                           onClick={() => toggleDevice(device.id, device.status)}
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
@@ -576,7 +576,7 @@ export default function SmartControl() {
                               ? 'bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)] hover:bg-[rgba(234,179,8,0.22)]' 
                               : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
                           }`}
-                          aria-label="Toggle selected unit"
+                          aria-label="Toggle unit"
                         >
                           <Power size={21} className={isOn ? 'stroke-[2.5px]' : ''} />
                         </button>
@@ -584,7 +584,7 @@ export default function SmartControl() {
                     </div>
 
                     {group.length > 1 ? (
-                      <div className="relative mb-3">
+                      <div className="relative z-10 mb-3">
                         <button
                           type="button"
                           onClick={() => setOpenUnitMenu((current) => (current === type ? null : type))}
@@ -629,17 +629,17 @@ export default function SmartControl() {
                         )}
                       </div>
                     ) : (
-                      <p className="mb-3 truncate rounded-xl border border-zinc-800 bg-black/20 px-3 py-2.5 text-sm font-semibold text-white">
+                      <p className="relative z-10 mb-3 truncate rounded-xl border border-zinc-800 bg-black/20 px-3 py-2.5 text-sm font-semibold text-white">
                         {getDeviceLabel(device)}
                       </p>
                     )}
 
-                    <div className="mb-4 flex items-center justify-between gap-3 text-sm">
+                    <div className="relative z-10 mb-4 flex items-center justify-between gap-3 text-sm">
                       <span className={hasRunningUnit ? 'text-zinc-300' : 'text-zinc-500'}>{device.location ?? "Whole house"}</span>
                       <span className="font-bold text-white">{device.power_usage_w} W</span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 border-t border-zinc-800 pt-3">
+                    <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-zinc-800 pt-3">
                       <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
                         hasRunningUnit ? 'bg-green-500/10 text-green-300' : 'bg-zinc-800 text-zinc-500'
                       }`}>
@@ -647,20 +647,22 @@ export default function SmartControl() {
                         {hasRunningUnit ? `${runningCount} On` : 'Off'}
                       </span>
                       <div className="flex items-center gap-2">
-                        <ThemedTooltip label="Edit selected unit">
+                        <ThemedTooltip label="Edit unit">
                           <button
+                            type="button"
                             onClick={() => beginEdit(device)}
                             className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:text-white"
-                            aria-label="Edit selected unit"
+                            aria-label="Edit unit"
                           >
                             <Pencil size={15} />
                           </button>
                         </ThemedTooltip>
-                        <ThemedTooltip label="Remove selected unit">
+                        <ThemedTooltip label="Remove unit">
                           <button
+                            type="button"
                             onClick={() => removeDevice(device)}
                             className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
-                            aria-label="Remove selected unit"
+                            aria-label="Remove unit"
                           >
                             <Trash2 size={15} />
                           </button>
@@ -669,7 +671,7 @@ export default function SmartControl() {
                     </div>
 
                     {hasRunningUnit && (
-                      <div className={`pointer-events-none absolute inset-0 ${overlayClass}`}></div>
+                      <div className={`pointer-events-none absolute inset-0 z-0 ${overlayClass}`}></div>
                     )}
                   </div>
                 );

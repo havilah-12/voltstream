@@ -16,10 +16,10 @@ voltstream/
 |-- backend/
 |   |-- Dockerfile
 |   |-- config.py
+|   |-- db.py
 |   |-- main.py
-|   |-- qa_bot.py
 |   |-- requirements.txt
-|   |-- streamlit_app.py
+|   |-- seed_db.py
 |   |-- data/
 |   |-- routers/
 |   |-- schemas/
@@ -119,7 +119,7 @@ If `GEMINI_API_KEY` is not set, the bot falls back to grounded local answers fro
 - `PATCH /api/v1/devices/{id}` - update device status
 - `GET /api/v1/billing/summary` - billing summary
 - `POST /api/v1/chat` - conversational Chat Bot endpoint for VoltStream help and assistant replies
-- `POST /api/v1/qa` - grounded Q&A Bot endpoint using Chroma retrieval and optional file attachments
+- `POST /api/v1/qa` - grounded AI Assistant endpoint using Chroma retrieval and VoltStream guide context
 
 ## Frontend Routes
 
@@ -136,11 +136,10 @@ The login/signup flow is a local demo auth layer using `localStorage`.
 
 ## Assistant Features
 
-- Chat Bot mode for conversational platform help
-- Q&A Bot mode for grounded energy and document questions
-- ChromaDB retrieval for Q&A mode
+- VoltStream Bot mode for conversational energy help
+- VoltStream AI Assistant mode for grounded VoltStream questions
+- ChromaDB retrieval for AI Assistant mode
 - Gemini response generation
-- File attachments in Q&A (`.txt`, `.md`, `.csv`, `.json`, `.log`, `.pdf`)
 - Quick assistant available across pages
 - Full assistant page at `/chat`
 
