@@ -3,12 +3,14 @@ export const assistantModes = {
   qa: "qa",
 };
 
+// Mode-specific copy lives here so the shared assistant UI can switch between Chat Bot and AI Assistant cleanly.
 export const modeConfig = {
   [assistantModes.chat]: {
     label: "Chat Bot",
     title: "VoltStream Bot",
     subtitle: "Ask general questions about energy, solar savings, grid usage, and simple household energy terms.",
     placeholder: "What is the difference between kW and kWh?",
+    compactPlaceholder: "Ask about kW vs kWh...",
     loadingText: "Chat Bot is thinking...",
     memoryEmptyText: "I will summarize the main chat topics here.",
     quickLabel: "Quick Chat",
@@ -32,14 +34,15 @@ export const modeConfig = {
     title: "VoltStream AI Assistant",
     subtitle: "Ask about VoltStream pages, controls, billing details, and how the platform works.",
     placeholder: "Which page should I open to control devices?",
-    loadingText: "AI Assistant is checking the VoltStream guide...",
+    compactPlaceholder: "Ask about a VoltStream page...",
+    loadingText: "AI Assistant is thinking...",
     memoryEmptyText: "I will summarize the main grounded Q&A topics here.",
     quickLabel: "Quick Q&A",
     suggestedQuestions: [
       "Which page should I open to control devices?",
       "How do I check my bill savings?",
       "Explain the dashboard in simple terms.",
-      "What does the Billing page show?",
+      "What will my estimated bill be next month after solar savings?",
     ],
     initialMessages: [
       {
@@ -52,6 +55,7 @@ export const modeConfig = {
   },
 };
 
+// Chat Memory groups earlier user prompts into lightweight topics for quick jump-back links.
 export function getMemoryLabel(question) {
   const lowered = question.toLowerCase();
   if (lowered.includes("solar")) return "Solar and savings questions";

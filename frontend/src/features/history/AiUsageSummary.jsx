@@ -19,6 +19,7 @@ function InsightCard({ icon: Icon, title, children, tone }) {
 export function AiUsageSummaryButton({ period, onClick }) {
   return (
     <button
+      data-tour="history-ai-summary"
       type="button"
       onClick={onClick}
       className="inline-flex items-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-4 py-2 text-sm font-bold text-[var(--volt-yellow)] transition-colors hover:bg-[rgba(234,179,8,0.22)]"

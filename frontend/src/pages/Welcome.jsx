@@ -7,21 +7,25 @@ const nextSteps = [
     title: "Check live energy",
     text: "See current grid power, solar power, bill savings, and eco impact.",
     icon: BarChart3,
+    iconClassName: "welcome-step-icon welcome-step-icon-grid",
   },
   {
     title: "Control devices",
     text: "View appliance usage and turn selected devices on or off.",
     icon: Settings2,
+    iconClassName: "welcome-step-icon welcome-step-icon-control",
   },
   {
     title: "Understand bills",
     text: "Track generated bill, payable bill, solar credit, and budget status.",
     icon: IndianRupee,
+    iconClassName: "welcome-step-icon welcome-step-icon-bill",
   },
   {
     title: "Ask the assistant",
     text: "Get simple explanations for solar surplus, grid draw, and platform terms.",
     icon: Bot,
+    iconClassName: "welcome-step-icon welcome-step-icon-bot",
   },
 ];
 
@@ -49,7 +53,7 @@ export default function Welcome() {
         </div>
 
         <p className="max-w-3xl text-base font-semibold leading-8 text-zinc-200">
-          Your dashboard is ready. VoltStream will help you monitor live power, compare solar and grid usage, manage smart devices, and understand how energy usage affects your bill.
+          Your house dashboard is ready. VoltStream will help you monitor live power in your home, compare solar and grid usage for your house, manage smart devices, and understand how your household energy usage affects your bill.
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -57,7 +61,7 @@ export default function Welcome() {
             const Icon = item.icon;
             return (
               <div key={item.title} className="rounded-3xl border border-zinc-800 bg-black/30 p-5">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)]">
+                <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)] ${item.iconClassName}`}>
                   <Icon size={22} />
                 </div>
                 <h2 className="font-display text-base font-semibold text-white">{item.title}</h2>

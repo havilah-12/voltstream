@@ -77,17 +77,29 @@ export default function Invoices() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--volt-yellow)]"></div>
+      <div className="space-y-6">
+        <PageHeader
+          title="Billing & Invoices"
+          subtitle="Manage your energy spend while tracking solar savings and budget alerts."
+        />
+        <div className="flex h-64 items-center justify-center rounded-3xl border border-zinc-900 bg-black/20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--volt-yellow)]"></div>
+        </div>
       </div>
     );
   }
 
   if (error && !data) {
     return (
-      <div className="rounded-3xl border border-red-600/40 bg-red-950/50 p-8 text-center text-red-200">
-        <h2 className="text-2xl font-semibold mb-3">Billing data unavailable</h2>
-        <p className="text-sm text-zinc-400">{error}</p>
+      <div className="space-y-6">
+        <PageHeader
+          title="Billing & Invoices"
+          subtitle="Manage your energy spend while tracking solar savings and budget alerts."
+        />
+        <div className="rounded-3xl border border-red-600/40 bg-red-950/50 p-8 text-center text-red-200">
+          <h2 className="text-2xl font-semibold mb-3">Billing data unavailable</h2>
+          <p className="text-sm text-zinc-400">{error}</p>
+        </div>
       </div>
     );
   }
@@ -184,7 +196,7 @@ export default function Invoices() {
         </div>
       )}
 
-      <div data-tour="billing-panels" className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:col-span-2">
           <BillingSummary
             balance={safeData.current_balance}

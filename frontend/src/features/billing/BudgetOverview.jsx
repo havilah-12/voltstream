@@ -7,8 +7,8 @@ export default function BudgetOverview({ netProjectedBill, budgetLimit, isOverBu
   const remainingBudget = Math.max(budgetLimit - adjustedBill, 0);
 
   return (
-    <div className="h-full bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-800 flex flex-col">
-      <div className="mb-5">
+    <div data-tour="billing-payable-card" className="h-full bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-800 flex flex-col">
+      <div data-tour="billing-payable-amount" className="mb-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] rounded-full flex items-center justify-center">
             <IndianRupee size={20} />
@@ -20,6 +20,7 @@ export default function BudgetOverview({ netProjectedBill, budgetLimit, isOverBu
       </div>
 
       <div className="mt-auto">
+        <div data-tour="billing-budget-section">
         <div className="flex justify-between text-sm font-medium mb-2">
           <span className="text-zinc-400">Monthly Budget Used</span>
           <span className={isOverBudget ? "text-red-500 font-bold" : "text-white"}>{budgetPercentage.toFixed(0)}%</span>
@@ -39,7 +40,8 @@ export default function BudgetOverview({ netProjectedBill, budgetLimit, isOverBu
             ? `Over budget by ₹${adjustedBill - budgetLimit}.`
             : `₹${remainingBudget} left in this month's budget.`}
         </p>
-        <div className="mt-5 rounded-xl border border-zinc-800 bg-black/25 p-4">
+        </div>
+        <div data-tour="billing-payment-section" className="mt-5 rounded-xl border border-zinc-800 bg-black/25 p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-300">
             <CalendarClock size={17} className="text-[var(--volt-yellow)]" />
             <span>{canPay ? "Payment is open today" : `Pay on ${nextPaymentDate}`}</span>

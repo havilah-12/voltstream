@@ -11,7 +11,7 @@ export default function BillingSummary({
   onDownloadCurrentInvoice,
 }) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+    <div data-tour="billing-generated-card" className="flex h-full flex-col rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)]">
@@ -28,11 +28,11 @@ export default function BillingSummary({
           PDF
         </button>
       </div>
-      <div className="mb-5">
+      <div data-tour="billing-generated-amount" className="mb-5">
         <span className="text-5xl font-bold text-[var(--volt-yellow)]">₹{balance}</span>
         <p className="mt-2 text-sm font-medium text-zinc-400">Bill generated this month so far</p>
       </div>
-      <div className="mt-auto border-t border-zinc-800 pt-4">
+      <div data-tour="billing-split" className="mt-auto border-t border-zinc-800 pt-4">
         <h4 className="mb-3 text-sm font-semibold text-white">Grid And Solar Bill Split</h4>
         <div className="mb-3 flex items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-black/20 px-4 py-3">
           <span className="flex items-center gap-2 text-sm text-zinc-400">

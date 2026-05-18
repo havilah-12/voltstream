@@ -27,3 +27,4 @@ backend/chroma_data/
 backend/*.log
 backend/*.out.log
 backend/*.err.log
+frontend/*.log

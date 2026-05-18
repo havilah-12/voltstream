@@ -1,7 +1,8 @@
 // Used by Dashboard, Usage History, Smart Control, and Billing pages.
 export default function PageHeader({ title, subtitle, className = "" }) {
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    // Shared header anchor so the guided tour can start from a stable page title target.
+    <div data-tour="page-heading" className={`flex flex-col gap-2 ${className}`}>
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">{title}</h1>

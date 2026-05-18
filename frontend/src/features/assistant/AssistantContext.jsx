@@ -4,6 +4,7 @@ import { assistantModes, getMemoryLabel, modeConfig } from "./assistantConstants
 
 const AssistantContext = createContext(null);
 
+// Each bot mode keeps its own messages, loading state, and error state so toggling does not wipe the other side.
 function buildInitialModeState() {
   return Object.fromEntries(
     Object.entries(modeConfig).map(([mode, config]) => [
@@ -24,11 +25,13 @@ export function AssistantProvider({ children }) {
     [assistantModes.chat]: {},
     [assistantModes.qa]: {},
   });
+  // Abort controllers let each mode stop its own in-flight response independently.
   const abortControllers = useRef({
     [assistantModes.chat]: null,
     [assistantModes.qa]: null,
   });
 
+  // Chat Memory is derived from earlier user prompts rather than stored separately in the backend.
   const buildChatMemory = (mode) => {
     const topicMap = new Map();
     modeState[mode].messages.forEach((message, index) => {
@@ -49,6 +52,30 @@ export function AssistantProvider({ children }) {
         error: nextError,
       },
     }));
+  };
+
+  const getFriendlyAssistantError = (modeOverride, err) => {
+    const loweredMessage = String(err?.message ?? "").toLowerCase();
+    const botLabel = modeConfig[modeOverride].label;
+
+    if (loweredMessage.includes("timeout")) {
+      return {
+        bubble: `${botLabel} is taking a little longer than usual. Please try again in a moment.`,
+        banner: `${botLabel} is taking longer than expected right now.`,
+      };
+    }
+
+    if (loweredMessage.includes("network") || loweredMessage.includes("failed")) {
+      return {
+        bubble: `I could not reach the ${botLabel} right now. Please try again in a moment.`,
+        banner: `${botLabel} is temporarily unavailable.`,
+      };
+    }
+
+    return {
+      bubble: `I could not complete that response right now. Please try again in a moment.`,
+      banner: `${botLabel} is temporarily unavailable.`,
+    };
   };
 
   const askQuestion = async (rawQuestion, files = [], modeOverride = activeMode, options = {}) => {
@@ -85,6 +112,7 @@ export function AssistantProvider({ children }) {
     });
 
     try {
+      // The mode switch decides whether the shared UI calls the general chat endpoint or the grounded QA endpoint.
       const requestFn = modeOverride === assistantModes.qa ? askQaBot : askChatBot;
       const response = await requestFn(trimmedQuestion, files, controller.signal);
       setModeState((current) => ({
@@ -125,18 +153,18 @@ export function AssistantProvider({ children }) {
         }));
         return;
       }
-      const botLabel = modeConfig[modeOverride].label;
+      const friendlyError = getFriendlyAssistantError(modeOverride, err);
       setModeState((current) => ({
         ...current,
         [modeOverride]: {
           ...current[modeOverride],
           loading: false,
-          error: err.message || "Unable to reach the assistant.",
+          error: friendlyError.banner,
           messages: [
             ...current[modeOverride].messages,
             {
               role: "assistant",
-              text: `I could not reach the ${botLabel} right now. Please check whether the backend is running and redeployed.`,
+              text: friendlyError.bubble,
               sources: [],
               attachments: [],
             },

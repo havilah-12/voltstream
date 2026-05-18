@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ArrowUpRight, Bot, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AssistantSurface from "../features/assistant/AssistantSurface";
-import { assistantModes } from "../features/assistant/assistantConstants";
 
 export default function QuickAssistant() {
   const [open, setOpen] = useState(false);
@@ -59,10 +58,9 @@ export default function QuickAssistant() {
               compact
               showSidebar={false}
               showHeader={false}
-              showModeSwitch={false}
+              showModeSwitch
               showPanelHeader={false}
               showCompactFooter={false}
-              fixedMode={assistantModes.chat}
             />
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api/devicesApi";
 import VoltSelect from "../components/VoltSelect";
 import ThemedTooltip from "../components/ThemedTooltip";
@@ -25,9 +25,44 @@ import {
   Trash2,
 } from "lucide-react";
 
+const DEVICE_TYPE_ALIASES = new Map([
+  [["ac", "air conditioner", "airconditioning", "air-conditioner"], "AC"],
+  [["fan"], "Fan"],
+  [["cooler", "air cooler"], "Cooler"],
+  [["heater", "room heater"], "Heater"],
+  [["water heater", "waterheater", "geyser"], "Water Heater"],
+  [["fridge", "refrigerator"], "Fridge"],
+  [["washing machine", "washer", "washingmachine"], "Washing Machine"],
+  [["light", "tube light", "tubelight"], "Tube Light"],
+  [["bulb"], "Bulb"],
+  [["tv", "television"], "TV"],
+  [["laptop", "computer"], "Laptop"],
+  [["charger"], "Charger"],
+  [["microwave", "microwave oven"], "Microwave"],
+  [["cooker", "electric cooker", "rice cooker"], "Cooker"],
+]);
+
+function normalizeTypeKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 const canonicalizeDeviceType = (type) => {
   if (!type) return type;
-  return type.toLowerCase() === "light" ? "Tube Light" : type;
+  const normalized = normalizeTypeKey(type);
+  for (const [aliases, canonical] of DEVICE_TYPE_ALIASES.entries()) {
+    if (aliases.includes(normalized)) {
+      return canonical;
+    }
+  }
+  return type
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 };
 
 const canonicalizeDeviceName = (device) => {
@@ -172,6 +207,7 @@ export default function SmartControl() {
   const [devices, setDevices] = useState([]);
   const [selectedByType, setSelectedByType] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [seasonalMode, setSeasonalMode] = useState("manual");
   const [activeCategory, setActiveCategory] = useState("Daily Essentials");
@@ -180,7 +216,6 @@ export default function SmartControl() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
-
   useEffect(() => {
     fetchDevices()
       .then((result) => {
@@ -202,6 +237,22 @@ export default function SmartControl() {
     const timer = window.setTimeout(() => setSuccessMessage(""), 3000);
     return () => window.clearTimeout(timer);
   }, [successMessage]);
+
+  useEffect(() => {
+    setOpenUnitMenu(null);
+    setPendingDeleteId(null);
+  }, [activeCategory, page]);
+
+  useEffect(() => {
+    const closeOpenMenu = (event) => {
+      if (!event.target.closest("[data-unit-menu]")) {
+        setOpenUnitMenu(null);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOpenMenu);
+    return () => document.removeEventListener("mousedown", closeOpenMenu);
+  }, []);
 
   const toggleDevice = async (id, currentStatus) => {
     const newStatus = currentStatus === "ON" ? "OFF" : "ON";
@@ -233,15 +284,16 @@ export default function SmartControl() {
   };
 
   const beginAdd = (type = "AC") => {
-    const count = devices.filter((device) => getDeviceType(device) === type).length + 1;
+    const normalizedType = canonicalizeDeviceType(type);
+    const count = devices.filter((device) => getDeviceType(device) === normalizedType).length + 1;
     setSuccessMessage("");
     setEditingId("new");
     setForm({
-      type,
-      name: `${type} ${count}`,
+      type: normalizedType,
+      name: `${normalizedType} ${count}`,
       location: "",
       status: "OFF",
-      power_usage_w: getTypeConfig(type).watts,
+      power_usage_w: getTypeConfig(normalizedType).watts,
     });
   };
 
@@ -279,6 +331,7 @@ export default function SmartControl() {
 
   const beginEdit = (device) => {
     setEditingId(device.id);
+    setPendingDeleteId(null);
     setForm({
       type: getDeviceType(device),
       name: device.name,
@@ -290,7 +343,12 @@ export default function SmartControl() {
 
   const saveDevice = async (event) => {
     event.preventDefault();
-    const payload = { ...form, power_usage_w: Number(form.power_usage_w) || 0 };
+    const canonicalType = canonicalizeDeviceType(form.type);
+    const payload = {
+      ...form,
+      type: canonicalType,
+      power_usage_w: Number(form.power_usage_w) || 0,
+    };
 
     if (editingId === "new") {
       const created = await createDevice(payload);
@@ -308,14 +366,43 @@ export default function SmartControl() {
   };
 
   const removeDevice = async (device) => {
-    await deleteDevice(device.id);
-    setDevices((prev) => prev.filter((item) => item.id !== device.id));
+    const previousDevices = devices;
+    const nextDevices = previousDevices.filter((item) => item.id !== device.id);
+    const deviceType = getDeviceType(device);
+
+    setDevices(nextDevices);
+    setOpenUnitMenu((current) => (current === deviceType ? null : current));
+    setPendingDeleteId(null);
     setSelectedByType((prev) => {
       const next = { ...prev };
-      if (next[getDeviceType(device)] === device.id) delete next[getDeviceType(device)];
+      const fallbackSelection = nextDevices.find((item) => getDeviceType(item) === deviceType);
+      if (next[deviceType] === device.id) {
+        if (fallbackSelection) {
+          next[deviceType] = fallbackSelection.id;
+        } else {
+          delete next[deviceType];
+        }
+      }
       return next;
     });
     if (editingId === device.id) setEditingId(null);
+
+    try {
+      await deleteDevice(device.id);
+      setSuccessMessage("Device removed successfully.");
+    } catch (deleteError) {
+      console.error(deleteError);
+      setDevices(previousDevices);
+      setSelectedByType(
+        Object.fromEntries(
+          Object.entries(getPreferredSelections(previousDevices)).map(([type, selectedDevice]) => [
+            type,
+            selectedDevice.id,
+          ])
+        )
+      );
+      setError(deleteError.message || "Unable to remove device.");
+    }
   };
 
   if (loading) {
@@ -528,7 +615,9 @@ export default function SmartControl() {
                 const selectedId = selectedByType[type] ?? group[0]?.id;
                 const device = group.find((item) => item.id === selectedId) ?? group[0];
                 const isOn = device.status === "ON";
+                const toggleLabel = isOn ? "Turn off device" : "Turn on device";
                 const runningCount = group.filter((item) => item.status === "ON").length;
+                const runningDevices = group.filter((item) => item.status === "ON");
                 const hasRunningUnit = runningCount > 0;
                 const glowClass =
                   runningCount >= 3
@@ -548,9 +637,9 @@ export default function SmartControl() {
                 const DeviceIcon = config.icon;
 
                 return (
-                  <div 
+                  <div
                     key={type} 
-                    className={`relative flex h-full min-h-[340px] flex-col rounded-2xl p-4 border transition-all duration-300 ${
+                    className={`relative flex h-full min-h-[190px] flex-col rounded-2xl p-4 border transition-all duration-300 ${
                       openUnitMenu === type ? "z-40 overflow-visible" : "overflow-visible"
                     } ${
                       hasRunningUnit 
@@ -568,7 +657,10 @@ export default function SmartControl() {
                           <p className="text-xs font-semibold text-zinc-500">{runningCount} / {group.length} running</p>
                         </div>
                       </div>
-                      <ThemedTooltip label="Toggle unit">
+                      <ThemedTooltip
+                        label={toggleLabel}
+                        tooltipClassName="right-0 left-auto top-auto bottom-full z-[140] mb-3 mt-0 translate-x-0"
+                      >
                         <button
                           onClick={() => toggleDevice(device.id, device.status)}
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all ${
@@ -576,7 +668,7 @@ export default function SmartControl() {
                               ? 'bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)] hover:bg-[rgba(234,179,8,0.22)]' 
                               : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
                           }`}
-                          aria-label="Toggle unit"
+                          aria-label={toggleLabel}
                         >
                           <Power size={21} className={isOn ? 'stroke-[2.5px]' : ''} />
                         </button>
@@ -584,24 +676,27 @@ export default function SmartControl() {
                     </div>
 
                     {group.length > 1 ? (
-                      <div className="relative z-10 mb-3">
+                      <div data-unit-menu className="relative z-[70] mb-3">
                         <button
                           type="button"
-                          onClick={() => setOpenUnitMenu((current) => (current === type ? null : type))}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenUnitMenu((current) => (current === type ? null : type));
+                          }}
                           className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm font-semibold outline-none transition-colors ${
                             hasRunningUnit
                               ? 'border-[var(--volt-yellow-border)] bg-black/35 text-white hover:border-[var(--volt-yellow)]'
                               : 'border-zinc-700 bg-zinc-950 text-white hover:border-[var(--volt-yellow-border)]'
                           }`}
                         >
-                          <span className="truncate">{getDeviceLabel(device)}</span>
+                          <span className="truncate">{canonicalizeDeviceName(device)}</span>
                           <ChevronDown
                             size={16}
                             className={`shrink-0 ${hasRunningUnit ? 'text-[var(--volt-yellow)]' : 'text-zinc-500'}`}
                           />
                         </button>
                         {openUnitMenu === type && (
-                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-44 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
+                          <div className="assistant-scrollbar absolute left-0 right-0 top-[calc(100%+8px)] z-[90] max-h-[168px] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_24px_50px_rgba(0,0,0,0.6)] ring-1 ring-black/40">
                             {group.map((item) => {
                               const selected = item.id === device.id;
                               return (
@@ -612,14 +707,24 @@ export default function SmartControl() {
                                     setSelectedByType((prev) => ({ ...prev, [type]: item.id }));
                                     setOpenUnitMenu(null);
                                   }}
-                                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-bold transition-colors ${
+                                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
                                     selected
                                       ? "bg-[var(--volt-yellow)] text-black"
                                       : "text-white hover:bg-[var(--volt-yellow-soft)] hover:text-[var(--volt-yellow)]"
                                   }`}
                                 >
-                                  <span className="truncate">{getDeviceLabel(item)}</span>
-                                  <span className={selected ? "text-xs text-black/70" : "text-xs text-zinc-500"}>
+                                  <p className="min-w-0 flex-1 truncate text-sm font-bold leading-6">
+                                    {canonicalizeDeviceName(item)}
+                                  </p>
+                                  <span
+                                    className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${
+                                      selected
+                                        ? "bg-black/10 text-black/80"
+                                        : item.status === "ON"
+                                          ? "bg-emerald-500/15 text-emerald-300"
+                                          : "bg-zinc-800 text-zinc-500"
+                                    }`}
+                                  >
                                     {item.status === "ON" ? "On" : "Off"}
                                   </span>
                                 </button>
@@ -634,39 +739,84 @@ export default function SmartControl() {
                       </p>
                     )}
 
-                    <div className="relative z-10 mb-4 flex items-center justify-between gap-3 text-sm">
+                    {group.length > 1 ? (
+                      <div className="relative z-10 mb-3 min-h-[36px]">
+                        {runningDevices.length > 0 ? (
+                          <p className="line-clamp-2 text-xs font-semibold leading-5 text-emerald-300">
+                            Running now: {runningDevices.map((item) => item.name).join(", ")}
+                          </p>
+                        ) : (
+                          <p className="text-xs font-semibold leading-5 text-zinc-500">
+                            No devices are currently running in this group.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+
+                    <div className="relative z-10 mb-3 flex items-center justify-between gap-3 text-sm">
                       <span className={hasRunningUnit ? 'text-zinc-300' : 'text-zinc-500'}>{device.location ?? "Whole house"}</span>
                       <span className="font-bold text-white">{device.power_usage_w} W</span>
                     </div>
 
                     <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-zinc-800 pt-3">
-                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
-                        hasRunningUnit ? 'bg-green-500/10 text-green-300' : 'bg-zinc-800 text-zinc-500'
-                      }`}>
-                        <span className={`h-2 w-2 rounded-full ${hasRunningUnit ? 'bg-green-500' : 'bg-zinc-600'}`}></span>
-                        {hasRunningUnit ? `${runningCount} On` : 'Off'}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <ThemedTooltip label="Edit unit">
-                          <button
-                            type="button"
-                            onClick={() => beginEdit(device)}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:text-white"
-                            aria-label="Edit unit"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                        </ThemedTooltip>
-                        <ThemedTooltip label="Remove unit">
-                          <button
-                            type="button"
-                            onClick={() => removeDevice(device)}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
-                            aria-label="Remove unit"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </ThemedTooltip>
+                      <div
+                        className={`pointer-events-none absolute inset-0 z-20 flex items-center justify-center transition-opacity duration-200 ${
+                          pendingDeleteId === device.id ? "opacity-100" : "opacity-0"
+                        }`}
+                      >
+                        <div className="pointer-events-auto w-full max-w-[320px] rounded-2xl border border-red-500/25 bg-zinc-950/96 p-4 shadow-[0_20px_45px_rgba(0,0,0,0.55)] backdrop-blur-sm">
+                          <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-3">
+                            <p className="text-sm font-semibold text-red-200">Remove this device from Smart Control?</p>
+                            <p className="mt-1 text-xs font-medium text-zinc-400">{getDeviceLabel(device)}</p>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setPendingDeleteId(null)}
+                              className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeDevice(device)}
+                              className="flex-1 rounded-xl border border-red-500/30 bg-red-500/15 px-3 py-2 text-xs font-bold text-red-200 transition-colors hover:bg-red-500/25"
+                            >
+                              Yes
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`flex items-center justify-between gap-3 w-full ${pendingDeleteId === device.id ? "opacity-15" : "opacity-100"}`}>
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
+                          hasRunningUnit ? 'bg-green-500/10 text-green-300' : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          <span className={`h-2 w-2 rounded-full ${hasRunningUnit ? 'bg-green-500' : 'bg-zinc-600'}`}></span>
+                          {hasRunningUnit ? `${runningCount} On` : 'Off'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <ThemedTooltip label="Edit device">
+                            <button
+                              type="button"
+                              onClick={() => beginEdit(device)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:text-white"
+                              aria-label="Edit device"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          </ThemedTooltip>
+                          <ThemedTooltip label="Remove device">
+                            <button
+                              type="button"
+                              onClick={() => setPendingDeleteId(device.id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
+                              aria-label="Remove device"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </ThemedTooltip>
+                        </div>
                       </div>
                     </div>
 

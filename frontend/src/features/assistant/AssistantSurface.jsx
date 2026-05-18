@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAssistant } from "./AssistantContext";
 import { assistantModes } from "./assistantConstants";
 
+// Shared message renderer for both bot modes, with a tiny inline bold parser for guided answers.
 function renderInlineFormatting(text, keyPrefix) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   return parts.map((part, index) => {
@@ -81,6 +82,7 @@ function MessageBody({ text }) {
   );
 }
 
+// One toggle controls the active assistant mode while reusing the same page layout underneath.
 function ModeSwitch({ compact = false }) {
   const { activeMode, setActiveMode, modeConfig } = useAssistant();
 
@@ -160,7 +162,7 @@ export default function AssistantSurface({
     ? "flex min-h-11 flex-1 items-center gap-2 rounded-2xl border border-zinc-800 bg-black px-3 focus-within:border-[var(--volt-yellow)]"
     : "flex min-h-12 flex-1 items-center gap-2 rounded-2xl border border-zinc-800 bg-black px-3 focus-within:border-[var(--volt-yellow)]";
   const inputClasses = compact
-    ? "min-h-11 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-[15px] placeholder:text-zinc-600"
+    ? "min-h-11 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-[12px] placeholder:font-medium placeholder:text-zinc-600"
     : "min-h-12 flex-1 bg-transparent text-white outline-none placeholder:text-zinc-600";
   const askButtonClasses = compact
     ? "flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--volt-yellow)] px-4 text-sm font-bold text-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
@@ -186,6 +188,7 @@ export default function AssistantSurface({
       ) : null}
 
       <section className={shellClasses}>
+        {/* Main conversation panel shared by Chat Bot and AI Assistant. */}
         <div data-tour="chat-panel" className={chatPanelClasses}>
           {showPanelHeader ? (
             <div className="border-b border-zinc-800 px-5 py-4">
@@ -256,7 +259,7 @@ export default function AssistantSurface({
                 <input
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
-                  placeholder={config.placeholder}
+                  placeholder={compact ? config.compactPlaceholder ?? config.placeholder : config.placeholder}
                   className={inputClasses}
                 />
               </div>
@@ -283,6 +286,7 @@ export default function AssistantSurface({
         </div>
 
         {showSidebar ? (
+          /* Sidebar switches its content from modeConfig, so "Try These" and Chat Memory adapt to the active bot. */
           <aside data-tour="chat-suggestions" className="space-y-4 xl:sticky xl:top-24 xl:self-start">
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5">
               <div className="mb-4 flex items-center gap-3">

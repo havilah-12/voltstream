@@ -34,17 +34,17 @@ export default function Signup() {
           </p>
           <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-              <BarChart3 className="mb-3 text-violet-300" size={24} />
+              <BarChart3 className="welcome-step-icon welcome-step-icon-grid mb-3 text-violet-300" size={24} />
               <h2 className="font-display text-sm font-semibold text-white">Live Usage</h2>
               <p className="mt-2 text-sm text-zinc-500">Track grid and solar power in one dashboard.</p>
             </div>
             <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-              <IndianRupee className="mb-3 text-emerald-300" size={24} />
+              <IndianRupee className="welcome-step-icon welcome-step-icon-bill mb-3 text-emerald-300" size={24} />
               <h2 className="font-display text-sm font-semibold text-white">Bill Savings</h2>
               <p className="mt-2 text-sm text-zinc-500">Understand how usage changes your bill.</p>
             </div>
             <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-              <Leaf className="mb-3 text-green-300" size={24} />
+              <Leaf className="welcome-step-icon welcome-step-icon-bot mb-3 text-green-300" size={24} />
               <h2 className="font-display text-sm font-semibold text-white">Eco Impact</h2>
               <p className="mt-2 text-sm text-zinc-500">See how solar reduces energy impact.</p>
             </div>

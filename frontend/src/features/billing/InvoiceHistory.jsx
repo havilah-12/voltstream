@@ -3,7 +3,7 @@ import { CheckCircle2, Download, Receipt } from "lucide-react";
 
 export default function InvoiceHistory({ invoices, onDownload }) {
   return (
-    <div className="h-full rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
+    <div data-tour="billing-invoices-card" className="h-full rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-sm">
       <div className="mb-6">
         <h3 className="text-xl font-semibold text-white">Recent Invoices</h3>
       </div>
