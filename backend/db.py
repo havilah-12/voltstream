@@ -50,6 +50,14 @@ def initialize_database() -> None:
                 current_grid_data_usage REAL NOT NULL,
                 solar_energy_usage REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS invoice_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                month TEXT NOT NULL,
+                amount REAL NOT NULL,
+                status TEXT NOT NULL,
+                invoice_number TEXT NOT NULL
+            );
             """
         )
         connection.commit()
@@ -64,6 +72,7 @@ def seed_database_if_empty() -> None:
         has_history = cursor.execute("SELECT 1 FROM analytics_history LIMIT 1").fetchone()
         has_devices = cursor.execute("SELECT 1 FROM devices LIMIT 1").fetchone()
         has_billing = cursor.execute("SELECT 1 FROM billing_summary WHERE id = 1").fetchone()
+        has_invoices = cursor.execute("SELECT 1 FROM invoice_history LIMIT 1").fetchone()
 
         if not has_dashboard:
             dashboard = mock_db["dashboard_live"]
@@ -133,6 +142,24 @@ def seed_database_if_empty() -> None:
                     billing["current_grid_data_usage"],
                     billing["solar_energy_usage"],
                 ),
+            )
+
+        if not has_invoices:
+            rows = [
+                (
+                    invoice["month"],
+                    invoice["amount"],
+                    invoice["status"],
+                    invoice["invoice_number"],
+                )
+                for invoice in mock_db["invoice_history"]
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO invoice_history (month, amount, status, invoice_number)
+                VALUES (?, ?, ?, ?)
+                """,
+                rows,
             )
 
         connection.commit()

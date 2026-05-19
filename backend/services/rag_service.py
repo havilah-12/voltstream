@@ -15,10 +15,14 @@ BILLING_TERMS = {
     "estimate",
     "estimated",
     "invoice",
+    "history",
     "month",
+    "next",
     "payable",
     "pay",
+    "past",
     "price",
+    "previous",
     "projected",
     "rs",
     "saving",
@@ -43,6 +47,20 @@ LIVE_TERMS = {
 NAVIGATION_TERMS = {"find", "navigate", "navigation", "open", "page", "where"}
 PERSONAL_IDENTITY_TERMS = {"anme", "name"}
 GUIDE_CHUNK_LIMIT = 5
+MONTH_INDEX = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+}
 
 QA_PROMPT_TEMPLATE = """You are the VoltStream AI Assistant.
 
@@ -50,10 +68,51 @@ Answer using only the provided document context and SQL context.
 If the answer is not in the context, say exactly: {out_of_scope_answer}
 If the context is only related but does not contain the exact requested fact, number, estimate, or instruction, say exactly: {out_of_scope_answer}
 Do not answer with a general definition when the user asks for a specific estimate or value.
+If exact current billing is unavailable but SQL invoice history contains enough billing records, give a clear estimate based on that history.
 For page/navigation questions, name the page from the document context.
+For how-to platform questions, give short user-facing steps from the context.
 For billing or bill-savings navigation questions, prefer the Billing page context when it is present.
 For current usage, device, billing, budget, savings, or estimate questions, use SQL context when available.
 If both document context and SQL context are present, combine them naturally.
+Keep the answer concise and do not show hidden reasoning.
+
+Examples:
+
+Question:
+Which page should I open to control devices?
+
+Context:
+The Smart Control page lets users monitor and control household devices.
+
+Answer:
+Open the Smart Control page.
+
+Question:
+What will my estimated bill be next month?
+
+Context:
+SQL invoice history context: Average historical bill is Rs.2525. Estimated next bill from invoice history is Rs.2488.
+
+Answer:
+Based on invoice history, your estimated next bill is Rs.2488.
+
+Question:
+How can I pay my current bill?
+
+Context:
+If the payment action is available, the user should open the Billing page, review the Payable Bill card, and use the payment action shown there.
+
+Answer:
+Open the Billing page, review the Payable Bill card, and use the payment action shown there.
+
+Question:
+What is my name?
+
+Context:
+The Billing page shows generated bill, payable bill, solar credit, budget status, and invoice history.
+
+Answer:
+I don't have that information.
 
 Question:
 {question}
@@ -114,6 +173,40 @@ def _fetch_billing_context(connection) -> str | None:
     )
 
 
+def _fetch_invoice_history_context(connection) -> str | None:
+    rows = connection.execute(
+        """
+        SELECT month, amount, status, invoice_number
+        FROM invoice_history
+        """
+    ).fetchall()
+    if not rows:
+        return None
+
+    rows = sorted(rows, key=lambda row: _month_sort_key(row["month"]), reverse=True)[:6]
+    amounts = [float(row["amount"]) for row in rows]
+    average_amount = sum(amounts) / len(amounts)
+    latest_amount = amounts[0]
+    estimated_next_bill = round((latest_amount + average_amount) / 2)
+    invoice_text = "; ".join(
+        f"{row['month']} {row['invoice_number']} was Rs.{float(row['amount']):.0f} and {row['status']}"
+        for row in rows
+    )
+    return (
+        "SQL invoice history context: "
+        f"{invoice_text}. "
+        f"Average historical bill is Rs.{average_amount:.0f}. "
+        f"Estimated next bill from invoice history is Rs.{estimated_next_bill:.0f}."
+    )
+
+
+def _month_sort_key(month_label: str) -> tuple[int, int]:
+    parts = month_label.lower().split()
+    if len(parts) < 2:
+        return (0, 0)
+    return (int(parts[-1]) if parts[-1].isdigit() else 0, MONTH_INDEX.get(parts[0], 0))
+
+
 def _fetch_live_context(connection) -> str | None:
     row = connection.execute(
         """
@@ -164,6 +257,7 @@ def _get_sql_context(terms: set[str]) -> list[str]:
     with get_connection() as connection:
         context = [
             _fetch_billing_context(connection) if needs_billing else None,
+            _fetch_invoice_history_context(connection) if needs_billing else None,
             _fetch_live_context(connection) if needs_live else None,
             _fetch_device_context(connection) if needs_devices else None,
         ]

@@ -458,7 +458,7 @@ export default function SmartControl() {
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div data-tour="page-heading">
+          <div data-tour="smart-control-heading">
             <h1 className="font-display text-2xl font-bold text-white">Smart Control</h1>
             <p className="text-zinc-400 mt-1">Manage your home appliances remotely</p>
           </div>

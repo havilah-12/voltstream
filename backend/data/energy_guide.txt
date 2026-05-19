@@ -51,6 +51,12 @@ Payable Bill means the amount left to pay after solar savings are taken into acc
 Solar Credit means value gained because solar reduced the need to purchase energy from the grid.
 Budget Status helps the user understand whether the home is currently staying within the selected monthly target.
 The invoice list provides recent billing records and downloadable demo invoice PDFs for review.
+To check the current bill, open the Billing page and review the Generated Bill, Payable Bill, Solar Credit, and Budget Status cards.
+To understand solar savings on the bill, open the Billing page and compare the Generated Bill with the Payable Bill and Solar Credit.
+To download the current invoice, open the Billing page and use the download action on the current billing summary card.
+To download an older invoice, open the Billing page, go to Invoice History, choose the invoice month, and use its download action.
+If the payment action is available, the user should open the Billing page, review the Payable Bill card, and use the payment action shown there.
+If the payment action is not visible, the assistant should tell the user to use the Billing page to review the payable amount and invoice details.
 
 Assistant page:
 The Assistant page lets users ask questions about VoltStream, grid power, solar energy, solar surplus, smart devices, billing, and platform navigation.

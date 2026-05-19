@@ -52,5 +52,10 @@ mock_db = {
         "budget_limit": 2500,
         "current_grid_data_usage": 320,
         "solar_energy_usage": 210
-    }
+    },
+    "invoice_history": [
+        {"month": "April 2026", "amount": 2450, "status": "Paid", "invoice_number": "INV-1042"},
+        {"month": "March 2026", "amount": 2600, "status": "Paid", "invoice_number": "INV-1041"},
+        {"month": "February 2026", "amount": 2320, "status": "Paid", "invoice_number": "INV-1040"}
+    ]
 }

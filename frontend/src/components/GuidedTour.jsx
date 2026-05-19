@@ -29,7 +29,7 @@ const pageIntroSteps = {
     body: "This page shows historical grid and solar data so you can compare usage patterns over time.",
   },
   "/devices": {
-    target: "page-heading",
+    target: "smart-control-heading",
     title: "Smart Control Overview",
     body: "This page lets you monitor appliances, see running devices, and control selected units.",
   },
@@ -252,7 +252,7 @@ export default function GuidedTour() {
         const visibleBottom = Math.min(viewportHeight - 8, targetRect.bottom + 8);
         const height = isPageOverview
           ? Math.max(260, viewportHeight - top - 16)
-          : Math.max(96, Math.min(targetRect.height + 16, visibleBottom - top));
+          : Math.max(48, Math.min(targetRect.height + 16, visibleBottom - top));
 
         return { top, left, width, height };
       })()
@@ -301,7 +301,7 @@ export default function GuidedTour() {
         />
       ))}
       <div
-        className="pointer-events-none fixed z-[90] rounded-3xl border-2 border-[var(--volt-yellow)] bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.55),0_0_34px_rgba(234,179,8,0.55)] transition-all duration-300"
+        className="pointer-events-none fixed z-[90] rounded-2xl border-2 border-[var(--volt-yellow)] bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.55),0_0_28px_rgba(234,179,8,0.48)] transition-all duration-300"
         style={highlight}
       />
       <section
