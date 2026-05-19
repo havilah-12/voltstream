@@ -56,15 +56,26 @@ export const modeConfig = {
 };
 
 // Chat Memory groups earlier user prompts into lightweight topics for quick jump-back links.
-export function getMemoryLabel(question) {
+export function getMemoryLabel(question, mode = assistantModes.chat) {
   const lowered = question.toLowerCase();
-  if (lowered.includes("solar")) return "Solar and savings questions";
-  if (lowered.includes("grid")) return "Grid power questions";
-  if (lowered.includes("bill")) return "Billing questions";
-  if (lowered.includes("device") || lowered.includes("appliance")) return "Device usage questions";
-  if (lowered.includes("name") || lowered.includes("who are you")) return "Assistant identity questions";
-  if (lowered.includes("how are you") || lowered === "hi" || lowered === "hello") return "General conversation";
-  return "Platform help questions";
+
+  if (mode === assistantModes.chat) {
+    if (lowered.includes("kw") || lowered.includes("kwh") || lowered.includes("term")) return "General energy terms";
+    if (lowered.includes("solar")) return "Solar energy questions";
+    if (lowered.includes("grid")) return "Grid power questions";
+    if (lowered.includes("bill") || lowered.includes("saving")) return "Energy bill and savings questions";
+    if (lowered.includes("device") || lowered.includes("appliance")) return "Home appliance energy questions";
+    if (lowered.includes("name") || lowered.includes("who are you")) return "Chat bot identity questions";
+    if (lowered.includes("how are you") || lowered === "hi" || lowered === "hello") return "General conversation";
+    return "General energy questions";
+  }
+
+  if (lowered.includes("page") || lowered.includes("open") || lowered.includes("where")) return "Platform navigation questions";
+  if (lowered.includes("bill") || lowered.includes("invoice") || lowered.includes("pay")) return "VoltStream billing questions";
+  if (lowered.includes("device") || lowered.includes("appliance") || lowered.includes("control")) return "Smart Control questions";
+  if (lowered.includes("dashboard") || lowered.includes("grid") || lowered.includes("solar")) return "Dashboard and energy data questions";
+  if (lowered.includes("name") || lowered.includes("who are you")) return "Out-of-scope checks";
+  return "VoltStream guide questions";
 }
 
 export const attachmentAccept = ".txt,.md,.csv,.json,.log,.pdf";

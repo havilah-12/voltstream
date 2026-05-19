@@ -36,7 +36,7 @@ export function AssistantProvider({ children }) {
     const topicMap = new Map();
     modeState[mode].messages.forEach((message, index) => {
       if (message.role !== "user") return;
-      topicMap.set(getMemoryLabel(message.text), index);
+      topicMap.set(getMemoryLabel(message.text, mode), index);
     });
     return Array.from(topicMap, ([topic, messageIndex]) => ({ topic, messageIndex })).slice(-4);
   };
