@@ -48,7 +48,7 @@ def _get_collection():
     try:
         import chromadb
     except ImportError:
-        logger.warning("ChromaDB is not installed. Falling back to keyword retrieval.")
+        logger.warning("ChromaDB is not installed. RAG retrieval is unavailable.")
         return None
 
     persist_path = Path(settings.chroma_path)
@@ -95,7 +95,7 @@ def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
     try:
         result = collection.query(query_texts=[question], n_results=limit)
     except Exception as exc:
-        logger.warning("Chroma query failed, falling back to keyword retrieval: %s", exc)
+        logger.warning("Chroma query failed: %s", exc)
         return []
 
     documents = result.get("documents", [])

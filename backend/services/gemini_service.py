@@ -29,5 +29,5 @@ def ask_gemini(
         response = model.generate_content(prompt)
         return (response.text or "").strip() or None
     except Exception as exc:
-        logger.warning("Gemini request failed, using local grounded answer: %s", exc)
+        logger.warning("Gemini request failed: %s", exc)
         return None

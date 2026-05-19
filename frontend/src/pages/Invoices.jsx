@@ -7,7 +7,7 @@ import BudgetOverview from "../features/billing/BudgetOverview";
 import InvoiceHistory from "../features/billing/InvoiceHistory";
 import { downloadInvoicePdf } from "../utils/invoicePdf";
 
-const fallbackBilling = {
+const defaultBillingSnapshot = {
   current_balance: 1850,
   projected_bill: 3200,
   budget_limit: 2500,
@@ -57,11 +57,11 @@ export default function Invoices() {
 
     fetchBillingSummary()
       .then((result) => {
-        if (!cancelled) setData(result ?? fallbackBilling);
+        if (!cancelled) setData(result ?? defaultBillingSnapshot);
       })
       .catch((err) => {
         if (!cancelled) {
-          setData(fallbackBilling);
+          setData(defaultBillingSnapshot);
           setWarning("Showing a billing snapshot right now.");
           setError(err.message || "Unable to load billing summary.");
         }

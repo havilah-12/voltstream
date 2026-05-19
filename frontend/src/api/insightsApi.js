@@ -77,7 +77,7 @@ ${JSON.stringify(dataSummary, null, 2)}
   `.trim();
 }
 
-function buildFallbackInsights({ period, analytics, billing, devices }) {
+function buildLocalInsights({ period, analytics, billing, devices }) {
   const getDeviceLabel = (device) =>
     device.location ? `${device.name} - ${device.location}` : device.name;
   const totalGrid = analytics.reduce((sum, item) => sum + Number(item.grid ?? 0), 0);
@@ -129,5 +129,5 @@ export async function generateUsageInsights({ period, analytics, billing, device
     return parsed;
   }
 
-  return buildFallbackInsights({ period, analytics, billing, devices });
+  return buildLocalInsights({ period, analytics, billing, devices });
 }

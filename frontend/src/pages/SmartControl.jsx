@@ -375,10 +375,10 @@ export default function SmartControl() {
     setPendingDeleteId(null);
     setSelectedByType((prev) => {
       const next = { ...prev };
-      const fallbackSelection = nextDevices.find((item) => getDeviceType(item) === deviceType);
+      const replacementSelection = nextDevices.find((item) => getDeviceType(item) === deviceType);
       if (next[deviceType] === device.id) {
-        if (fallbackSelection) {
-          next[deviceType] = fallbackSelection.id;
+        if (replacementSelection) {
+          next[deviceType] = replacementSelection.id;
         } else {
           delete next[deviceType];
         }
