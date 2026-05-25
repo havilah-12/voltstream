@@ -12,28 +12,31 @@ import NotFound from "./pages/NotFound";
 import Signup from "./pages/Signup";
 import Welcome from "./pages/Welcome";
 import { AssistantProvider } from "./features/assistant/AssistantContext";
+import { NotificationProvider } from "./features/notifications/NotificationContext";
 
 function App() {
   return (
     <AuthProvider>
       <AssistantProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/welcome" element={<Welcome />} />
-              <Route path="/" element={<Layout />}>
-                <Route index element={<LiveDashboard />} />
-                <Route path="analytics" element={<UsageHistory />} />
-                <Route path="devices" element={<SmartControl />} />
-                <Route path="billing" element={<Invoices />} />
-                <Route path="chat" element={<EnergyAssistant />} />
-                <Route path="*" element={<NotFound />} />
+        <NotificationProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/welcome" element={<Welcome />} />
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<LiveDashboard />} />
+                  <Route path="analytics" element={<UsageHistory />} />
+                  <Route path="devices" element={<SmartControl />} />
+                  <Route path="billing" element={<Invoices />} />
+                  <Route path="chat" element={<EnergyAssistant />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
       </AssistantProvider>
     </AuthProvider>
   );

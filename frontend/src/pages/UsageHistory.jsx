@@ -31,6 +31,7 @@ export default function UsageHistory() {
   const [insights, setInsights] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [insightsError, setInsightsError] = useState(null);
+  const [insightsPeriod, setInsightsPeriod] = useState(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
@@ -63,9 +64,19 @@ export default function UsageHistory() {
   );
 
   useEffect(() => {
+    if (!summaryOpen) {
+      return undefined;
+    }
+
     if (!insightInputReady) {
       setInsights(null);
       setInsightsLoading(true);
+      return undefined;
+    }
+
+    if (insights && insightsPeriod === period) {
+      setInsightsLoading(false);
+      setInsightsError(null);
       return undefined;
     }
 
@@ -81,7 +92,10 @@ export default function UsageHistory() {
       dashboard,
       signal: controller.signal,
     })
-      .then((result) => setInsights(result))
+      .then((result) => {
+        setInsights(result);
+        setInsightsPeriod(period);
+      })
       .catch((err) => {
         if (err?.name === "CanceledError" || err?.name === "AbortError") return;
         setInsightsError(err.message || "Unable to generate AI summary right now.");
@@ -89,7 +103,7 @@ export default function UsageHistory() {
       .finally(() => setInsightsLoading(false));
 
     return () => controller.abort();
-  }, [billing, dashboard, data, devices, insightInputReady, period]);
+  }, [billing, dashboard, data, devices, insightInputReady, insights, insightsPeriod, period, summaryOpen]);
 
   const totalGrid = data.reduce((sum, item) => sum + Number(item.grid ?? 0), 0);
   const totalSolar = data.reduce((sum, item) => sum + Number(item.solar ?? 0), 0);

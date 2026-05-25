@@ -34,7 +34,7 @@ function readCachedResponse(cacheKey) {
   return entry.data;
 }
 
-function clearResponseCache() {
+export function clearResponseCache() {
   responseCache.clear();
   pendingRequests.clear();
 }

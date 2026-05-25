@@ -20,12 +20,18 @@ export default function BudgetOverview({ netProjectedBill, budgetLimit, isOverBu
       </div>
 
       <div className="mt-auto">
-        <div data-tour="billing-budget-section">
+        <div data-tour="billing-budget-section" className="group/budget relative">
         <div className="flex justify-between text-sm font-medium mb-2">
           <span className="text-zinc-400">Monthly Budget Used</span>
           <span className={isOverBudget ? "text-red-500 font-bold" : "text-white"}>{budgetPercentage.toFixed(0)}%</span>
         </div>
-        <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden">
+        <div className="relative h-3 w-full rounded-full bg-zinc-800">
+          <div
+            className="pointer-events-none absolute bottom-full z-[90] mb-2 -translate-x-1/2 rounded-lg border border-[var(--volt-yellow-border)] bg-zinc-950 px-3 py-2 text-xs font-bold text-[var(--volt-yellow)] opacity-0 shadow-xl shadow-black/70 transition-opacity duration-150 group-hover/budget:opacity-100 group-focus-within/budget:opacity-100"
+            style={{ left: `${Math.max(18, Math.min(budgetPercentage, 82))}%` }}
+          >
+            Used Rs.{adjustedBill}
+          </div>
           <div
             className={`h-full rounded-full transition-all duration-1000 ${isOverBudget ? 'bg-red-500' : 'bg-[var(--volt-yellow)]'}`}
             style={{ width: `${budgetPercentage}%` }}

@@ -1,7 +1,18 @@
-from uuid import uuid4
 
 from db import get_connection
 from schemas.device import DevicePayload, DeviceStatusUpdate
+
+
+def _slugify_device_type(device_type: str) -> str:
+    return "-".join(device_type.lower().split())
+
+
+def _next_device_index(connection, slug: str) -> int:
+    row = connection.execute(
+        "SELECT COUNT(*) FROM devices WHERE id LIKE ?",
+        (f"{slug}-%",),
+    ).fetchone()
+    return (row[0] if row else 0) + 1
 
 
 def list_devices():
@@ -17,11 +28,11 @@ def list_devices():
 
 
 def create_device(device: DevicePayload):
-    slug = device.type.lower().replace(" ", "-")
     new_device = device.model_dump()
-    new_device["id"] = f"{slug}-{uuid4().hex[:6]}"
+    slug = _slugify_device_type(new_device["type"])
 
     with get_connection() as connection:
+        new_device["id"] = f"{slug}-{_next_device_index(connection, slug)}"
         connection.execute(
             """
             INSERT INTO devices (id, type, name, location, status, power_usage_w)

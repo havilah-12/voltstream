@@ -19,9 +19,9 @@ export default function Signup() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-black px-4 py-10">
       <section className="grid w-full max-w-5xl grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
-        <aside className="rounded-3xl border border-[var(--volt-yellow-border)] bg-[radial-gradient(circle_at_top_left,rgba(234,179,8,0.18),transparent_36%),#18181b] p-7 shadow-xl">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-2xl bg-[var(--volt-yellow)] p-3 text-black">
+        <aside className="signup-card-animate rounded-3xl border border-[var(--volt-yellow-border)] bg-[radial-gradient(circle_at_top_left,rgba(234,179,8,0.18),transparent_36%),#18181b] p-7 shadow-xl" style={{ "--signup-card-delay": "0ms" }}>
+          <div className="signup-reveal mb-6 flex items-center gap-3" style={{ "--signup-reveal-delay": "0ms" }}>
+            <div className="signup-hero-icon rounded-2xl bg-[var(--volt-yellow)] p-3 text-black">
               <Zap size={28} />
             </div>
             <div>
@@ -29,30 +29,49 @@ export default function Signup() {
               <p className="text-sm font-semibold text-zinc-400">Smart household energy usage monitoring.</p>
             </div>
           </div>
-          <p className="max-w-2xl text-base font-semibold leading-8 text-zinc-200">
+          <p
+            className="signup-reveal max-w-2xl text-base font-semibold leading-8 text-zinc-200"
+            style={{ "--signup-reveal-delay": "120ms" }}
+          >
             VoltStream is for your household energy monitoring. It helps you see how much power comes from the grid, how much solar is generated, which smart devices are using energy, and how all of that affects your monthly bill.
           </p>
           <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-              <BarChart3 className="welcome-step-icon welcome-step-icon-grid mb-3 text-violet-300" size={24} />
+            <div
+              className="signup-reveal rounded-2xl border border-zinc-800 bg-black/30 p-4"
+              style={{ "--signup-reveal-delay": "260ms" }}
+            >
+              <div className="signup-feature-icon signup-feature-icon-usage mb-3">
+                <BarChart3 size={24} />
+              </div>
               <h2 className="font-display text-sm font-semibold text-white">Live Usage</h2>
               <p className="mt-2 text-sm text-zinc-500">Track grid and solar power in one dashboard.</p>
             </div>
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-              <IndianRupee className="welcome-step-icon welcome-step-icon-bill mb-3 text-emerald-300" size={24} />
+            <div
+              className="signup-reveal rounded-2xl border border-zinc-800 bg-black/30 p-4"
+              style={{ "--signup-reveal-delay": "380ms" }}
+            >
+              <div className="signup-feature-icon signup-feature-icon-bill mb-3">
+                <IndianRupee size={24} />
+              </div>
               <h2 className="font-display text-sm font-semibold text-white">Bill Savings</h2>
               <p className="mt-2 text-sm text-zinc-500">Understand how usage changes your bill.</p>
             </div>
-            <div className="rounded-2xl border border-zinc-800 bg-black/30 p-4">
-              <Leaf className="welcome-step-icon welcome-step-icon-bot mb-3 text-green-300" size={24} />
+            <div
+              className="signup-reveal rounded-2xl border border-zinc-800 bg-black/30 p-4"
+              style={{ "--signup-reveal-delay": "500ms" }}
+            >
+              <div className="signup-feature-icon signup-feature-icon-eco mb-3">
+                <Leaf size={24} />
+              </div>
               <h2 className="font-display text-sm font-semibold text-white">Eco Impact</h2>
               <p className="mt-2 text-sm text-zinc-500">See how solar reduces energy impact.</p>
             </div>
           </div>
         </aside>
 
-        <div className="w-full rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl">
-          <div className="mb-8 flex items-center gap-3">
+        {/* Sign-up card with entry transition staggered */}
+        <div className="signup-card-animate w-full rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl" style={{ "--signup-card-delay": "300ms" }}>
+          <div className="signup-reveal mb-8 flex items-center gap-3" style={{ "--signup-reveal-delay": "80ms" }}>
             <div className="rounded-2xl bg-[var(--volt-yellow)] p-3 text-black">
               <Zap size={26} />
             </div>
@@ -63,7 +82,7 @@ export default function Signup() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+            <div className="signup-reveal" style={{ "--signup-reveal-delay": "180ms" }}>
               <label className="mb-2 block text-sm font-bold text-zinc-400">Name</label>
               <input
                 value={name}
@@ -72,7 +91,7 @@ export default function Signup() {
                 required
               />
             </div>
-            <div>
+            <div className="signup-reveal" style={{ "--signup-reveal-delay": "280ms" }}>
               <label className="mb-2 block text-sm font-bold text-zinc-400">Email</label>
               <input
                 type="email"
@@ -82,7 +101,7 @@ export default function Signup() {
                 required
               />
             </div>
-            <div>
+            <div className="signup-reveal" style={{ "--signup-reveal-delay": "380ms" }}>
               <label className="mb-2 block text-sm font-bold text-zinc-400">Password</label>
               <input
                 type="password"
@@ -92,16 +111,18 @@ export default function Signup() {
                 required
               />
             </div>
-            <button
-              type="submit"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--volt-yellow)] font-bold text-black transition-colors hover:brightness-110"
-            >
-              <UserPlus size={18} />
-              Sign Up
-            </button>
+            <div className="signup-reveal" style={{ "--signup-reveal-delay": "460ms" }}>
+              <button
+                type="submit"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--volt-yellow)] font-bold text-black transition-colors hover:brightness-110"
+              >
+                <UserPlus size={18} />
+                Sign Up
+              </button>
+            </div>
           </form>
 
-          <p className="mt-6 text-center text-sm font-semibold text-zinc-500">
+          <p className="signup-reveal mt-6 text-center text-sm font-semibold text-zinc-500" style={{ "--signup-reveal-delay": "520ms" }}>
             Already have an account?{" "}
             <Link to="/login" className="text-[var(--volt-yellow)] hover:underline">
               Login

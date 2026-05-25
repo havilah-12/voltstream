@@ -6,6 +6,7 @@ import BillingSummary from "../features/billing/BillingSummary";
 import BudgetOverview from "../features/billing/BudgetOverview";
 import InvoiceHistory from "../features/billing/InvoiceHistory";
 import { downloadInvoicePdf } from "../utils/invoicePdf";
+import { useNotifications } from "../features/notifications/notificationStore";
 
 const defaultBillingSnapshot = {
   current_balance: 1850,
@@ -51,6 +52,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
+  const { notify } = useNotifications();
 
   useEffect(() => {
     let cancelled = false;
@@ -61,9 +63,15 @@ export default function Invoices() {
       })
       .catch((err) => {
         if (!cancelled) {
+          const message = err.message || "Unable to load billing summary.";
           setData(defaultBillingSnapshot);
           setWarning("Showing a billing snapshot right now.");
-          setError(err.message || "Unable to load billing summary.");
+          setError(message);
+          notify({
+            type: "warning",
+            title: "Billing snapshot loaded",
+            message,
+          });
         }
       })
       .finally(() => {
@@ -73,7 +81,7 @@ export default function Invoices() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [notify]);
 
   if (loading) {
     return (
@@ -150,6 +158,11 @@ export default function Invoices() {
         status: isOverBudget ? "Attention" : "In Budget",
       }),
     });
+    notify({
+      type: "success",
+      title: "Invoice downloaded",
+      message: "Current month invoice PDF is ready.",
+    });
   };
 
   const handleDownloadHistoryInvoice = (invoice) => {
@@ -157,6 +170,11 @@ export default function Invoices() {
       ...buildInvoicePayload(invoice),
       generatedBill: invoice.amount,
       payableBill: invoice.amount,
+    });
+    notify({
+      type: "success",
+      title: "Invoice downloaded",
+      message: `${invoice.month} invoice PDF is ready.`,
     });
   };
 

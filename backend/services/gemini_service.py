@@ -1,8 +1,15 @@
 import logging
 
+import google.generativeai as genai
+
 from config import get_settings
 
 logger = logging.getLogger("voltstream")
+
+# Configure once at startup — not on every request
+_settings = get_settings()
+genai.configure(api_key=_settings.gemini_api_key)
+_model = genai.GenerativeModel(_settings.gemini_model)
 
 
 def ask_gemini(
@@ -10,23 +17,17 @@ def ask_gemini(
     chunks: list[str],
     prompt_template: str,
     *,
-    out_of_scope_answer: str,
+    out_of_scope_answer: str = "",
 ) -> str | None:
-    settings = get_settings()
-    if not settings.gemini_api_key:
+    if not _settings.gemini_api_key:
         return None
-
     try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
         prompt = prompt_template.format(
             out_of_scope_answer=out_of_scope_answer,
             question=question,
-            context=chr(10).join(chunks),
+            context="\n".join(chunks),
         )
-        response = model.generate_content(prompt)
+        response = _model.generate_content(prompt)
         return (response.text or "").strip() or None
     except Exception as exc:
         logger.warning("Gemini request failed: %s", exc)

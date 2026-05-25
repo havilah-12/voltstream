@@ -1,14 +1,22 @@
 import logging
+from contextlib import asynccontextmanager
 
 from db import initialize_database
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from routers import analytics, billing, chat, dashboard, devices
+from routers import agent, analytics, billing, chat, dashboard, devices
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("voltstream")
 
-app = FastAPI(title="VoltStream API", version="1.0")
+
+@asynccontextmanager
+async def lifespan(api: FastAPI):
+    initialize_database()
+    yield
+
+
+app = FastAPI(title="VoltStream API", version="1.0", lifespan=lifespan)
 
 
 async def log_requests(request: Request, call_next):
@@ -39,6 +47,7 @@ def register_routes(api: FastAPI) -> None:
     api.include_router(devices.router, prefix="/api/v1/devices")
     api.include_router(billing.router, prefix="/api/v1/billing")
     api.include_router(chat.router, prefix="/api/v1")
+    api.include_router(agent.router, prefix="/api/v1/agent")
 
 
 @app.get("/", include_in_schema=False)
@@ -48,8 +57,3 @@ def root():
 
 configure_middleware(app)
 register_routes(app)
-
-
-@app.on_event("startup")
-def startup() -> None:
-    initialize_database()

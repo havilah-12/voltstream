@@ -11,22 +11,35 @@ export default function VoltSelect({
   title,
   className = "",
   buttonClassName = "",
+  open: controlledOpen,
+  onOpenChange,
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
   const menuRef = useRef(null);
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
 
+  const setOpen = (next) => {
+    if (isControlled) {
+      onOpenChange?.(next);
+      return;
+    }
+    setUncontrolledOpen(next);
+  };
+
   useEffect(() => {
     const closeOnOutsideClick = (event) => {
+      if (isControlled) return;
       if (!menuRef.current?.contains(event.target)) setOpen(false);
     };
 
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, []);
+  }, [isControlled]);
 
   return (
-    <div ref={menuRef} className={`relative ${open ? "z-[90]" : "z-10"} ${className}`}>
+    <div ref={menuRef} className={`relative ${open ? "z-[220]" : "z-10"} ${className}`}>
       <ThemedTooltip label={title} className="block">
         <button
           type="button"
@@ -46,7 +59,7 @@ export default function VoltSelect({
       </ThemedTooltip>
 
       {open ? (
-        <div className="assistant-scrollbar absolute left-0 right-0 top-[calc(100%+6px)] z-[100] max-h-56 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_18px_40px_rgba(0,0,0,0.48)]">
+        <div className="assistant-scrollbar absolute left-0 right-0 top-[calc(100%+6px)] z-[230] max-h-56 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_18px_40px_rgba(0,0,0,0.48)]">
           {options.map((option) => {
             const selected = option.value === value;
             return (

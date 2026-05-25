@@ -8,7 +8,7 @@ DB_PATH = BACKEND_DIR / "voltstream.sqlite3"
 
 
 def get_connection() -> sqlite3.Connection:
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(DB_PATH, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     return connection
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpRight, Bot, X } from "lucide-react";
+import { ArrowUpRight, BotMessageSquare, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AssistantSurface from "../features/assistant/AssistantSurface";
 
@@ -13,7 +13,7 @@ export default function QuickAssistant() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div data-tour="quick-assistant" className="fixed bottom-5 right-5 z-50">
       {open ? (
         <div className="flex h-[min(78vh,720px)] w-[min(90vw,380px)] flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
           <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
@@ -74,10 +74,10 @@ export default function QuickAssistant() {
             className="quick-assistant-trigger flex h-14 w-14 items-center justify-center rounded-full bg-[var(--volt-yellow)] text-black shadow-[0_18px_50px_rgba(241,189,0,0.3)] transition-transform hover:-translate-y-0.5"
             aria-label="Open quick assistant"
           >
-            <Bot size={24} className="quick-assistant-trigger-icon" />
+            <BotMessageSquare size={24} className="quick-assistant-trigger-icon" />
           </button>
-          <span className="volt-tooltip right-0 top-full mt-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-            Open quick assistant
+          <span className="volt-tooltip right-0 bottom-full mb-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+            Ask me
           </span>
         </div>
       ) : null}

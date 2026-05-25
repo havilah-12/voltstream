@@ -1,251 +1,238 @@
 # VoltStream
 
-VoltStream is a household smart energy monitoring platform with a React/Vite frontend and a FastAPI backend. It helps users understand live grid and solar power, device usage, billing impact, conversational platform help, and grounded Q&A through the assistant.
+> **Smart Energy Monitoring Platform with AI‑Powered Device Control & Conversational Assistant**
 
-## Tech Stack
+VoltStream is a household smart energy monitoring platform that helps users understand live grid and solar power, control smart devices, track billing, and get instant help through an AI assistant.
 
-- Frontend: React, Vite, React Router, Axios, Recharts, Tailwind CSS, Lucide icons
-- Backend: FastAPI, Uvicorn, Pydantic, Gemini API, ChromaDB-based RAG
-- Frontend hosting: Firebase Hosting
-- Backend deployment: Google Cloud Run
+---
 
-## Project Structure
+## ✨ Key Features
 
-```text
-voltstream/
-|-- backend/
-|   |-- Dockerfile
-|   |-- config.py
-|   |-- db.py
-|   |-- main.py
-|   |-- requirements.txt
-|   |-- seed_db.py
-|   |-- data/
-|   |-- routers/
-|   |-- schemas/
-|   `-- services/
-|-- frontend/
-|   |-- firebase.json
-|   |-- .firebaserc
-|   |-- src/
-|   |   |-- api/
-|   |   |-- auth/
-|   |   |-- components/
-|   |   |-- features/
-|   |   `-- pages/
-|   `-- package.json
-`-- README.md
-```
+### 📊 Energy Monitoring
+- **Live Dashboard**: Real-time grid draw, solar generation, and net usage.
+- **Analytics**: Daily, weekly, and monthly energy consumption trends.
+- **Solar Tracking**: Monitor solar coverage and savings.
 
-## Live Deployment
+### 🏠 Smart Device Control
+- **Manual Control**: Toggle devices on/off with instant UI feedback.
+- **AI Agent**: Natural language device control ("Turn off the AC").
+- **Scheduling**: Schedule devices for future times ("Turn on fan in 10 minutes").
+- **Seasonal Modes**: Summer, winter, energy‑saving, and vacation presets.
 
-- Frontend: [https://voltstreamapp-12.web.app](https://voltstreamapp-12.web.app)
-- Backend: [https://voltstream-api-2321325123.us-east4.run.app](https://voltstream-api-2321325123.us-east4.run.app)
-- API docs: [https://voltstream-api-2321325123.us-east4.run.app/docs](https://voltstream-api-2321325123.us-east4.run.app/docs)
+### 💬 AI Assistant
+- **Chat Bot**: Conversational help about energy concepts.
+- **Q&A Bot**: Grounded answers from VoltStream knowledge base (RAG).
+- **Quick Assistant**: Available on every page.
 
-The frontend is configured to call:
+### 💰 Billing & Savings
+- **Bill Tracking**: Current balance, projected bill, and payable amount.
+- **Solar Savings**: Calculate savings from solar generation.
+- **Invoice History**: View and download past invoices.
+- **Budget Alerts**: Track spending against budget limits.
+
+---
+
+## 🏗️ Core Architectural Flows
+
+VoltStream relies on a modern React (Vite) frontend, a FastAPI backend, embedded SQLite, and Google Gemini AI. Below are the core technical flows.
+
+### 1. 🤖 Device Agent Flow (Google ADK)
+The Device Agent handles natural language commands to control smart home devices.
 
 ```text
-https://voltstream-api-2321325123.us-east4.run.app/api/v1
+User Input: "Turn on the AC in 5 minutes" 
+   │
+   ▼
+[FastAPI Router] ──► injects exact current local time (Asia/Kolkata) into prompt
+   │
+   ▼
+[Google ADK Runner] ──► sends prompt to Gemini 2.5 Flash
+   │
+   ▼
+[Gemini AI] ──► determines tools needed based on instructions
+   │
+   ▼
+[Agent Tools]
+ ├─► 1. get_device_status("AC") ─► finds device ID 'ac-2'
+ ├─► 2. schedule_device_toggle("ac-2", "ON", "2026-05-25T10:45:00")
+   │
+   ▼
+[Python Threading] ──► sets a background timer for 5 minutes
+   │
+   ▼
+[Frontend SSE] ◄── streams "AC 2 will be turned ON in 5 minutes." back to UI
 ```
 
-## Local Development
+### 2. 🧠 RAG Flow (Knowledge Retrieval)
+The Retrieval-Augmented Generation (RAG) system powers grounded Q&A.
 
-### Backend
+```text
+User Question: "What is a solar surplus?"
+   │
+   ▼
+[ChromaDB Vector Store] ──► searches embedded chunks from 'energy_guide.txt'
+   │
+   ▼
+[SQLite DB] ──► grabs live dashboard and billing context
+   │
+   ▼
+[Context Assembly] ──► merges top 5 guide chunks + SQL live context
+   │
+   ▼
+[Gemini AI] ──► answers strictly using provided context
+   │
+   ▼
+[Response] ◄── sends factual answer + source citations to UI
+```
 
-Create and activate a virtual environment:
+### 3. 💬 Chatbot Flow (Conversational)
+A lightweight conversational bot for general energy concepts, strictly scoped.
 
+```text
+User Input: "How do solar panels work?"
+   │
+   ▼
+[System Prompt] ──► restricts AI to general concepts (no personal DB access)
+   │
+   ▼
+[Gemini AI] ──► generates short (2-4 sentence) plain text response
+   │
+   ▼
+[Response] ◄── Returns answer to user
+```
+
+### 4. 🗄️ Database Flow (SQLite)
+Embedded zero-config database using native python `sqlite3`.
+
+```text
+[Frontend API Call] ──► e.g. GET /api/v1/devices
+   │
+   ▼
+[FastAPI Service] 
+   │
+   ▼
+[db.py Context Manager] ──► opens thread-safe connection to voltstream.db
+   │
+   ▼
+[SQL Query] ──► SELECT * FROM devices
+   │
+   ▼
+[Data Return] ◄── rows formatted to dicts and served as JSON
+```
+**Core Tables:**
+- `devices` - Smart devices (AC, fan, lights, etc.)
+- `dashboard_live` - Real-time energy metrics
+- `analytics_history` - Historical usage data
+- `billing_summary` - Current billing info
+- `invoice_history` - Past invoices
+
+*(DB auto-initializes on startup with seed data from `backend/data/seed_db.py`)*
+
+### 5. 🧩 ChromaDB Flow (Vector Initialization)
+Handles the startup sequence for creating the vector database used in RAG.
+
+```text
+[App Startup] ──► triggers ChromaDB initialization
+   │
+   ▼
+[Read Document] ──► loads 'backend/data/energy_guide.txt'
+   │
+   ▼
+[Text Chunking] ──► splits text cleanly using double-newlines (\n\n)
+   │
+   ▼
+[Gemini Embeddings] ──► converts text chunks into vector embeddings via API
+   │
+   ▼
+[ChromaDB] ◄── stores vectors locally in 'chroma_data/' folder for fast querying
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js** 18+ (frontend)
+- **Python** 3.10+ (backend)
+- **Gemini API Key** (free from Google AI Studio)
+
+### 1. Clone Repository
+```bash
+git clone https://github.com/yourusername/voltstream.git
+cd voltstream
+```
+
+### 2. Backend Setup
 ```powershell
 cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
+
+# Create .env file
+copy .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+
+# Run backend
+uvicorn main:app --reload --port 8000
 ```
+Backend will be available at: http://localhost:8000
 
-Run the API locally:
-
-```powershell
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Backend local URLs:
-
-- API root: [http://localhost:8000](http://localhost:8000)
-- Swagger docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-### Frontend
-
-Install dependencies and start Vite:
-
+### 3. Frontend Setup
 ```powershell
 cd frontend
 npm install
 npm run dev
 ```
+Frontend will be available at: http://localhost:5173
 
-Frontend local URL:
+---
 
-- App: [http://localhost:5173](http://localhost:5173)
-
-If needed, set the backend URL before running Vite:
-
-```powershell
-$env:VITE_API_BASE_URL="http://localhost:8000/api/v1"
-npm run dev
+## 📁 Project Structure
+```
+voltstream/
+├── backend/                    # FastAPI backend
+│   ├── data/                   # Knowledge base & DB Seeds
+│   ├── routers/                # API endpoints
+│   ├── services/               # Core business & AI logic
+│   ├── schemas/                # Pydantic models
+│   ├── db.py                   # SQLite connection
+│   ├── config.py               # Configuration
+│   ├── main.py                 # FastAPI app
+│   └── requirements.txt        
+│
+├── frontend/                   # React frontend
+│   ├── src/
+│   │   ├── api/                # API client functions
+│   │   ├── components/         # Reusable UI components
+│   │   ├── features/           # Feature modules
+│   │   ├── pages/              # Main app views
+│   │   └── App.jsx             # Main app component
+│   └── package.json            
+│
+└── README.md                   # This file
 ```
 
-## Environment Setup
+---
 
-Create `backend/.env` from `backend/.env.example`.
+## 🔧 Tech Stack
 
-Example values:
+- **Frontend**: React 18, Vite, Tailwind CSS, Recharts, Lucide Icons
+- **Backend**: FastAPI, Pydantic, Python 3.10+
+- **Database**: Embedded SQLite, ChromaDB (Vector Store)
+- **AI/ML**: Google Gemini 2.5 Flash, Gemini Embeddings, Google Agent Development Kit (ADK)
 
-```env
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=models/gemini-2.5-flash
-GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
-CHROMA_COLLECTION_NAME=voltstream_guide
-CHROMA_PATH=chroma_data
-```
+---
 
-If `GEMINI_API_KEY` is not set, the bot falls back to grounded local answers from `backend/data/energy_guide.txt`.
+## 🌐 Live Deployment
+- **Frontend**: https://voltstreamapp-12.web.app (Firebase Hosting)
+- **Backend API**: https://voltstream-api-2321325123.us-east4.run.app (Google Cloud Run)
+- **API Docs**: https://voltstream-api-2321325123.us-east4.run.app/docs
 
-## API Routes
+---
 
-- `GET /api/v1/dashboard/live` - live dashboard metrics
-- `GET /api/v1/analytics/history?period=daily|weekly|monthly` - usage history
-- `GET /api/v1/devices/` - list devices
-- `PATCH /api/v1/devices/{id}` - update device status
-- `GET /api/v1/billing/summary` - billing summary
-- `POST /api/v1/chat` - conversational Chat Bot endpoint for VoltStream help and assistant replies
-- `POST /api/v1/qa` - grounded AI Assistant endpoint using Chroma retrieval and VoltStream guide context
-
-## Frontend Routes
-
-- `/` - live dashboard
-- `/analytics` - usage history
-- `/devices` - smart device control
-- `/billing` - billing and invoices
-- `/chat` - assistant page with Chat Bot and Q&A Bot modes
-- `/login` - demo login page
-- `/signup` - demo signup page
-- `/welcome` - first-time welcome flow
-
-The login/signup flow is a local demo auth layer using `localStorage`.
-
-## Assistant Features
-
-- VoltStream Bot mode for conversational energy help
-- VoltStream AI Assistant mode for grounded VoltStream questions
-- ChromaDB retrieval for AI Assistant mode
-- Gemini response generation
-- Quick assistant available across pages
-- Full assistant page at `/chat`
-
-## Billing Features
-
-- Generated bill and payable bill views
-- Solar savings and budget tracking
-- Invoice history
-- PDF download for current and historical invoices
-
-## Cloud Deployment
-
-VoltStream uses separate deployment paths:
-
-- Backend: deploy `backend/` to Cloud Run using `backend/Dockerfile`
-- Frontend: deploy `frontend/` to Firebase Hosting
-
-### Backend: Cloud Run
-
-```powershell
-gcloud auth login
-gcloud config set project voltstreamapp
-gcloud config set compute/region us-east4
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
-```
-
-Create the Artifact Registry repository once if needed:
-
-```powershell
-gcloud artifacts repositories create cloud-run-source-deploy --repository-format=docker --location=us-east4
-```
-
-Build and deploy:
-
-```powershell
-cd C:\Users\HAVILAH\Documents\TACHYON\Voltstream\voltstream\backend
-gcloud builds submit --tag us-east4-docker.pkg.dev/voltstreamapp/cloud-run-source-deploy/voltstream/voltstream-api
-gcloud run deploy voltstream-api --image us-east4-docker.pkg.dev/voltstreamapp/cloud-run-source-deploy/voltstream/voltstream-api --region us-east4 --allow-unauthenticated
-```
-
-### Frontend: Firebase Hosting
-
-```powershell
-cd C:\Users\HAVILAH\Documents\TACHYON\Voltstream\voltstream\frontend
-npm install
-npm run build
-firebase deploy --only hosting
-```
-
-## Useful Commands
-
-### Frontend
-
-```powershell
-cd frontend
-npm run build
-```
-
-### Backend
-
-```powershell
-cd backend
-.\venv\Scripts\python.exe -c "import main; print(main.app.title)"
-```
-
-Test Chat Bot locally:
-
-```powershell
-curl -X POST http://localhost:8000/api/v1/chat -H "Content-Type: application/json" -d "{\"question\":\"What is solar surplus?\"}"
-```
-
-Test Q&A Bot locally:
-
-```powershell
-curl -X POST http://localhost:8000/api/v1/qa -H "Content-Type: application/json" -d "{\"question\":\"What is the difference between kW and kWh?\"}"
-```
-
-Run the CLI Q&A bot:
-
-```powershell
-cd backend
-.\venv\Scripts\python.exe qa_bot.py
-```
-
-Run the Streamlit helper:
-
-```powershell
-cd backend
-streamlit run streamlit_app.py
-```
-
-## Nomenclature
-
-- **Grid Power / Grid Draw**: Live power currently taken from the electricity grid.
-- **Solar Power / Solar Generation**: Live power currently generated by the solar panels and available for home usage.
-- **Solar Surplus**: Extra solar power left after home usage is covered.
-- **Energy Balance / Net Usage**: Difference between grid draw and solar generation.
-- **kW**: Live power at one point in time.
-- **kWh**: Total energy used or generated over time.
-- **Solar Coverage**: Percentage of grid usage offset by solar generation.
-- **Bill Savings**: Estimated savings because solar reduced grid power purchase.
-- **Peak Grid Period**: Day, week, or month where grid usage was highest.
-- **RAG**: Retrieval-Augmented Generation.
-- **Chunk**: Smaller section of source context used for retrieval.
-- **Embedding Vector**: Numerical representation of text meaning.
-- **Grounded Answer**: Answer generated only from VoltStream context.
-- **Out-of-Scope Question**: Anything outside VoltStream, solar, grid, devices, billing, or the provided guide.
+## 🙏 Acknowledgments
+- **Google Gemini** - AI model and embeddings
+- **ChromaDB** - Vector database
+- **FastAPI** - Backend framework
+- **React** - Frontend framework

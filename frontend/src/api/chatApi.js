@@ -1,22 +1,20 @@
 // Assistant API calls for conversational chat and grounded Q&A.
 import { apiRequest } from "./client";
 
-function buildAssistantPayload(question) {
-  return { question };
-}
-
-export async function askChatBot(question, files = [], signal) {
+export async function askChatBot(question, files, signal, requestOptions = {}) {
   return apiRequest("/chat", {
     method: "post",
-    data: buildAssistantPayload(question),
+    data: { question },
     signal,
+    ...requestOptions,
   });
 }
 
-export async function askQaBot(question, files = [], signal) {
+export async function askQaBot(question, files, signal, requestOptions = {}) {
   return apiRequest("/qa", {
     method: "post",
-    data: buildAssistantPayload(question),
+    data: { question },
     signal,
+    ...requestOptions,
   });
 }

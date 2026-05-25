@@ -1,46 +1,23 @@
 from schemas.chat import ChatRequest, ChatResponse
 from services.gemini_service import ask_gemini
 
-GEMINI_EMPTY_ANSWER = "Gemini did not return a response right now. Please try again."
-HELP_ANSWER = (
-    "I'm the VoltStream Bot. I can help with general energy-related questions and simple terms like kW, kWh, "
-    "solar savings, grid usage, solar surplus, energy efficiency, and home appliance energy use."
-)
+GEMINI_EMPTY_ANSWER = "Something went wrong. Please try again."
 
-CHAT_PROMPT_TEMPLATE = """You are a normal general-purpose Gemini-style assistant.
+CHAT_PROMPT_TEMPLATE = """You are a helpful general energy dictionary for VoltStream.
 
-Answer the user's question directly.
-Keep answers short, usually 2 to 4 sentences.
-Use plain text only.
-Do not use Markdown formatting such as **bold**, *italics*, headings, or bullet points unless the user asks for a list.
+Answer general energy questions, solar basics, grid concepts, and define simple energy terms. 
+CRITICAL RULE: You DO NOT have access to the user's VoltStream account, billing data, live dashboard, or smart devices. 
+If the user asks about their specific account, bill, live usage, or VoltStream features, politely tell them to switch to the "AI Assistant" tab for personalized account help.
 
-User question:
-{question}
+Keep answers short (2-4 sentences).
+Use plain text only, no markdown formatting.
+
+Question: {question}
 
 Answer:"""
 
 
-def _plain_text(answer: str) -> str:
-    return (
-        answer.replace("**", "")
-        .replace("*   ", "")
-        .replace("* ", "")
-        .replace("### ", "")
-        .replace("## ", "")
-        .replace("# ", "")
-        .strip()
-    )
-
-
-def _is_help_question(question: str) -> bool:
-    normalized = question.lower().strip()
-    return "what can you help" in normalized or "what do you help" in normalized
-
-
 def answer_chat(request: ChatRequest) -> ChatResponse:
-    if _is_help_question(request.question):
-        return ChatResponse(answer=HELP_ANSWER, sources=[], used_gemini=False)
-
     answer = ask_gemini(
         request.question,
         [],
@@ -48,6 +25,6 @@ def answer_chat(request: ChatRequest) -> ChatResponse:
         out_of_scope_answer="",
     )
     if answer:
-        return ChatResponse(answer=_plain_text(answer), sources=[], used_gemini=True)
+        return ChatResponse(answer=answer, sources=[], used_gemini=True)
 
     return ChatResponse(answer=GEMINI_EMPTY_ANSWER, sources=[], used_gemini=False)

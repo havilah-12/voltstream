@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Brain, MessageCircleMore, Send, Sparkles, Square, UserRound } from "lucide-react";
+import { BotMessageSquare, Brain, MessageCircleMore, Send, Sparkles, Square, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAssistant } from "./AssistantContext";
 import { assistantModes } from "./assistantConstants";
@@ -213,7 +213,7 @@ export default function AssistantSurface({
                 >
                   {!isUser ? (
                     <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)]">
-                      <Bot size={18} />
+                      <BotMessageSquare size={18} />
                     </div>
                   ) : null}
                   <div

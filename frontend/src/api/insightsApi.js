@@ -1,4 +1,20 @@
-import { askChatBot } from "./chatApi";
+import { apiRequest } from "./client";
+
+const AI_SUMMARY_TIMEOUT_MS = 10000; // extended timeout for reliable LLM response
+
+const summaryCache = new Map();
+
+function buildCacheKey({ period }) {
+  return period;
+}
+
+function getCachedSummary(key) {
+  return summaryCache.get(key);
+}
+
+function setCachedSummary(key, data) {
+  summaryCache.set(key, data);
+}
 
 function stripCodeFences(text) {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -17,7 +33,7 @@ function buildDeviceSnapshot(devices) {
     device.location ? `${device.name} - ${device.location}` : device.name;
 
   const activeDevices = devices.filter((device) => device.status === "ON");
-  const topDevices = [...devices]
+  const topDevices = [...activeDevices]
     .sort((left, right) => Number(right.power_usage_w ?? 0) - Number(left.power_usage_w ?? 0))
     .slice(0, 4)
     .map((device) => ({
@@ -61,6 +77,9 @@ Rules:
 - Avoid sounding technical, analytical, or robotic.
 - Mention real patterns from the data when possible.
 - Focus on savings, solar usage, grid use, and device management.
+- Recommend actions for devices that are currently ON before mentioning OFF devices.
+- Do not suggest running seasonal or OFF devices just because solar is available.
+- If a high-power device is OFF, mention it only as something to keep off unless needed.
 - Do not mention JSON, APIs, databases, or technical internals.
 - Do not use jargon like offset, dependence, consumption profile, or optimization.
 - Prefer phrases like "you used more grid power", "solar helped more", "your bill may go up", or "try running this later in the day".
@@ -116,18 +135,46 @@ function buildLocalInsights({ period, analytics, billing, devices }) {
 }
 
 export async function generateUsageInsights({ period, analytics, billing, devices, dashboard, signal }) {
-  const response = await askChatBot(buildPrompt({ period, analytics, billing, devices, dashboard }), [], signal);
-  const parsed = parseJsonSafely(response?.answer ?? "");
-
-  if (
-    parsed &&
-    typeof parsed.whatHappened === "string" &&
-    typeof parsed.billSavings === "string" &&
-    Array.isArray(parsed.deviceSuggestions) &&
-    typeof parsed.futureOutlook === "string"
-  ) {
-    return parsed;
+  // Compute a deterministic cache key based on input data
+  const cacheKey = buildCacheKey({ period, analytics, billing, devices });
+  const cached = getCachedSummary(cacheKey);
+  if (cached) {
+    return cached; // fast return from cache
   }
 
-  return buildLocalInsights({ period, analytics, billing, devices });
+  const controller = new AbortController();
+  let timeoutId;
+
+  const abortAiRequest = () => controller.abort();
+  signal?.addEventListener("abort", abortAiRequest, { once: true });
+
+  try {
+    const response = await apiRequest("/analytics/summary", {
+      method: "post",
+      data: { question: buildPrompt({ period, analytics, billing, devices, dashboard }) },
+      signal,
+      timeout: AI_SUMMARY_TIMEOUT_MS
+    });
+    const parsed = parseJsonSafely(response?.answer ?? "");
+
+    if (
+      parsed &&
+      typeof parsed.whatHappened === "string" &&
+      typeof parsed.billSavings === "string" &&
+      Array.isArray(parsed.deviceSuggestions) &&
+      typeof parsed.futureOutlook === "string"
+    ) {
+      setCachedSummary(cacheKey, parsed);
+      return parsed;
+    }
+    throw new Error("Invalid AI summary format");
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    // Propagate any error – no fallback
+    throw err;
+  } finally {
+    // Ensure any timeout cleanup (if we ever used one)
+    if (timeoutId) window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortAiRequest);
+  }
 }

@@ -1,10 +1,11 @@
 // Used by App.jsx as the shared shell for every route page.
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Bot, LayoutDashboard, BarChart3, LogOut, Settings2, Receipt, Zap, User } from "lucide-react";
+import { BotMessageSquare, LayoutDashboard, BarChart3, LogOut, Settings2, Receipt, Zap, User } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import GuidedTour from "./GuidedTour";
 import QuickAssistant from "./QuickAssistant";
 import ThemedTooltip from "./ThemedTooltip";
+import NotificationCenter from "../features/notifications/NotificationCenter";
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -15,7 +16,7 @@ export default function Layout() {
     { name: "Usage History", path: "/analytics", icon: <BarChart3 size={18} /> },
     { name: "Smart Control", path: "/devices", icon: <Settings2 size={18} /> },
     { name: "Billing", path: "/billing", icon: <Receipt size={18} /> },
-    { name: "Assistant", path: "/chat", icon: <Bot size={18} /> },
+    { name: "Assistant", path: "/chat", icon: <BotMessageSquare size={18} /> },
   ];
   const handleLogout = () => {
     logout();
@@ -60,6 +61,7 @@ export default function Layout() {
                 <User size={16} />
               </div>
               <span className="font-display font-semibold text-[var(--volt-yellow)]">{user?.name ?? "Prosumer"}</span>
+              <NotificationCenter />
               <ThemedTooltip label="Logout">
                 <button
                   type="button"

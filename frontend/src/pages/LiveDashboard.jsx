@@ -9,6 +9,7 @@ import MetricCard from "../components/MetricCard";
 import LineChartPanel from "../features/dashboard/LineChartPanel";
 import PieChartPanel from "../features/dashboard/PieChartPanel";
 import TopConsumersTable from "../features/dashboard/TopConsumersTable";
+import { useNotifications } from "../features/notifications/notificationStore";
 
 
 function formatTime(date) {
@@ -55,6 +56,7 @@ export default function LiveDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
+  const { notify } = useNotifications();
 
   useEffect(() => {
     async function loadData() {
@@ -89,11 +91,21 @@ export default function LiveDashboard() {
 
       const failed = results.filter((result) => result.status === "rejected");
       if (failed.length === results.length) {
-        setError("Unable to load dashboard data. Please check your network or API.");
+        const message = "Unable to load dashboard data. Please check your network or API.";
+        setError(message);
+        notify({
+          type: "error",
+          title: "Dashboard unavailable",
+          message,
+        });
       } else if (failed.length > 0) {
-        setWarning(
-          "Some dashboard data could not be loaded and is shown partially."
-        );
+        const message = "Some dashboard data could not be loaded and is shown partially.";
+        setWarning(message);
+        notify({
+          type: "warning",
+          title: "Dashboard partially loaded",
+          message,
+        });
         console.warn(
           "Partial dashboard load failure:",
           failed.map((result) => result.reason?.message || "Fetch failed").join(" — ")
@@ -104,7 +116,7 @@ export default function LiveDashboard() {
     }
 
     loadData();
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);

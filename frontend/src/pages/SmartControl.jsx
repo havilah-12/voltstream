@@ -1,207 +1,60 @@
 import { useEffect, useRef, useState } from "react";
+import { runDeviceAgent } from "../api/agentApi";
 import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api/devicesApi";
 import VoltSelect from "../components/VoltSelect";
 import ThemedTooltip from "../components/ThemedTooltip";
+import { useNotifications } from "../features/notifications/notificationStore";
 import {
-  AirVent,
+  Bot,
+  CalendarClock,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Flame,
-  Laptop,
-  Leaf,
-  Lightbulb,
-  Microwave,
   Pencil,
-  Plug,
   Plus,
   Power,
-  Refrigerator,
-  Snowflake,
-  Tv,
-  WashingMachine,
-  Wind,
+  Send,
   Trash2,
+  X,
+  Zap,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 
-const DEVICE_TYPE_ALIASES = new Map([
-  [["ac", "air conditioner", "airconditioning", "air-conditioner"], "AC"],
-  [["fan"], "Fan"],
-  [["cooler", "air cooler"], "Cooler"],
-  [["heater", "room heater"], "Heater"],
-  [["water heater", "waterheater", "geyser"], "Water Heater"],
-  [["fridge", "refrigerator"], "Fridge"],
-  [["washing machine", "washer", "washingmachine"], "Washing Machine"],
-  [["light", "tube light", "tubelight"], "Tube Light"],
-  [["bulb"], "Bulb"],
-  [["tv", "television"], "TV"],
-  [["laptop", "computer"], "Laptop"],
-  [["charger"], "Charger"],
-  [["microwave", "microwave oven"], "Microwave"],
-  [["cooker", "electric cooker", "rice cooker"], "Cooker"],
-]);
+// Import extracted modules
+import {
+  deviceSections,
+  emptyForm,
+  seasonalModes,
+  statusOptions,
+} from "../features/devices/deviceConstants";
 
-function normalizeTypeKey(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
-}
+import {
+  canonicalizeDeviceName,
+  canonicalizeDeviceType,
+  getDeviceLabel,
+  getDeviceType,
+  getPreferredSelections,
+  getSavingStatus,
+  getTypeConfig,
+  normalizeType,
+  normalizeTypeKey,
+  withHouseholdDefaults,
+  getMentionedDeviceType,
+  messageSpecifiesDevice,
+} from "../features/devices/deviceUtils";
 
-const canonicalizeDeviceType = (type) => {
-  if (!type) return type;
-  const normalized = normalizeTypeKey(type);
-  for (const [aliases, canonical] of DEVICE_TYPE_ALIASES.entries()) {
-    if (aliases.includes(normalized)) {
-      return canonical;
-    }
-  }
-  return type
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-};
-
-const canonicalizeDeviceName = (device) => {
-  if (!device?.name) return device?.name;
-  return device.name.replace(/\bLight\b/g, "Tube Light");
-};
-
-const getDeviceType = (device) => canonicalizeDeviceType(device.type ?? device.name);
-const getDeviceLabel = (device) =>
-  `${canonicalizeDeviceName(device)}${device.location ? ` - ${device.location}` : ""}`;
-const emptyForm = { type: "AC", name: "AC 1", location: "Bedroom 1", status: "OFF", power_usage_w: 1500 };
-const statusOptions = [
-  { value: "ON", label: "Currently Running" },
-  { value: "OFF", label: "Turned Off" },
-];
-
-const householdDefaults = [
-  { id: "cooler-1", type: "Cooler", name: "Cooler 1", location: "Living Room", status: "OFF", power_usage_w: 220 },
-  { id: "water-heater-1", type: "Water Heater", name: "Water Heater 1", location: "Bathroom", status: "OFF", power_usage_w: 3000 },
-  { id: "light-1", type: "Tube Light", name: "Living Room Tube Light", location: "Living Room", status: "ON", power_usage_w: 18 },
-  { id: "light-2", type: "Tube Light", name: "Bedroom Tube Light", location: "Bedroom 1", status: "OFF", power_usage_w: 18 },
-  { id: "bulb-1", type: "Bulb", name: "Kitchen Bulb", location: "Kitchen", status: "ON", power_usage_w: 12 },
-  { id: "tv-1", type: "TV", name: "TV 1", location: "Living Room", status: "OFF", power_usage_w: 120 },
-  { id: "laptop-1", type: "Laptop", name: "Laptop Charger", location: "Study", status: "ON", power_usage_w: 65 },
-  { id: "microwave-1", type: "Microwave", name: "Microwave 1", location: "Kitchen", status: "OFF", power_usage_w: 1000 },
-  { id: "cooker-1", type: "Cooker", name: "Electric Cooker", location: "Kitchen", status: "OFF", power_usage_w: 700 },
-];
-
-const deviceTypeConfig = {
-  ac: { icon: Snowflake, tone: "text-sky-300 bg-sky-500/10 border-sky-500/20", watts: 1500 },
-  fan: { icon: Wind, tone: "text-cyan-300 bg-cyan-500/10 border-cyan-500/20", watts: 50 },
-  cooler: { icon: AirVent, tone: "text-teal-300 bg-teal-500/10 border-teal-500/20", watts: 220 },
-  heater: { icon: Flame, tone: "text-orange-300 bg-orange-500/10 border-orange-500/20", watts: 2000 },
-  "water heater": { icon: Flame, tone: "text-red-300 bg-red-500/10 border-red-500/20", watts: 3000 },
-  fridge: { icon: Refrigerator, tone: "text-lime-300 bg-lime-500/10 border-lime-500/20", watts: 200 },
-  "washing machine": { icon: WashingMachine, tone: "text-violet-300 bg-violet-500/10 border-violet-500/20", watts: 500 },
-  "tube light": { icon: Lightbulb, tone: "text-yellow-300 bg-yellow-500/10 border-yellow-500/20", watts: 18 },
-  bulb: { icon: Lightbulb, tone: "text-yellow-300 bg-yellow-500/10 border-yellow-500/20", watts: 12 },
-  tv: { icon: Tv, tone: "text-blue-300 bg-blue-500/10 border-blue-500/20", watts: 120 },
-  laptop: { icon: Laptop, tone: "text-indigo-300 bg-indigo-500/10 border-indigo-500/20", watts: 65 },
-  charger: { icon: Plug, tone: "text-zinc-300 bg-zinc-500/10 border-zinc-500/20", watts: 35 },
-  microwave: { icon: Microwave, tone: "text-rose-300 bg-rose-500/10 border-rose-500/20", watts: 1000 },
-  cooker: { icon: Plug, tone: "text-red-300 bg-red-500/10 border-red-500/20", watts: 700 },
-};
-
-const seasonalModes = {
-  manual: {
-    label: "Manual Control",
-    helper: "No automatic seasonal changes applied.",
-    icon: Power,
-  },
-  summer: {
-    label: "Summer Cooling",
-    helper: "AC, fans and coolers ON; heaters OFF.",
-    icon: Snowflake,
-    on: ["ac", "fan", "cooler"],
-    off: ["heater"],
-  },
-  winter: {
-    label: "Winter Warm",
-    helper: "Room heaters ON; AC, fans and coolers OFF.",
-    icon: Flame,
-    on: ["heater"],
-    off: ["ac", "fan", "cooler"],
-  },
-  saving: {
-    label: "Energy Saving",
-    helper: "Keeps 2 fans and key essentials ON; heavy appliances OFF.",
-    icon: Leaf,
-  },
-  vacation: {
-    label: "Vacation Mode",
-    helper: "Turns every listed device OFF while the home is away or inactive.",
-    icon: Power,
-    allOff: true,
-  },
-};
-
-const normalizeType = (type) => canonicalizeDeviceType(type).toLowerCase();
-const getPreferredSelections = (devices) =>
-  devices.reduce((selected, device) => {
-    const type = getDeviceType(device);
-    const existing = selected[type];
-    if (!existing || (device.status === "ON" && existing.status !== "ON")) {
-      selected[type] = device;
-    }
-    return selected;
-  }, {});
-
-const withHouseholdDefaults = (devices) => {
-  const existingIds = new Set(devices.map((device) => device.id));
-  const existingTypes = new Set(devices.map((device) => normalizeType(getDeviceType(device))));
-  const missingDefaults = householdDefaults.filter((device) => {
-    const type = normalizeType(getDeviceType(device));
-    return !existingIds.has(device.id) && !existingTypes.has(type);
-  });
-
-  return [...devices, ...missingDefaults];
-};
-
-const getTypeConfig = (type) => deviceTypeConfig[normalizeType(type)] ?? {
-  icon: Power,
-  tone: "text-zinc-300 bg-zinc-800 border-zinc-700",
-  watts: 200,
-};
-
-function getSavingStatus(device, typeIndex) {
-  const type = normalizeType(getDeviceType(device));
-  const count = typeIndex[type] ?? 0;
-
-  if (type === "fan") return count <= 2 ? "ON" : "OFF";
-  if (type === "tube light" || type === "bulb") return count <= 2 ? "ON" : "OFF";
-  if (["fridge", "laptop", "charger"].includes(type)) return "ON";
-  if (["ac", "cooler", "heater", "water heater", "washing machine", "microwave", "cooker", "tv"].includes(type)) return "OFF";
-  return Number(device.power_usage_w) <= 75 ? "ON" : "OFF";
-}
-
-const deviceSections = [
-  {
-    title: "Daily Essentials",
-    helper: "Everyday household devices",
-    types: ["fan", "tube light", "bulb", "fridge"],
-  },
-  {
-    title: "Climate Control",
-    helper: "Cooling and heating appliances",
-    types: ["ac", "cooler", "heater", "water heater"],
-  },
-  {
-    title: "Home Appliances",
-    helper: "Kitchen and laundry loads",
-    types: ["washing machine", "microwave", "cooker"],
-  },
-  {
-    title: "Electronics",
-    helper: "TV, laptop and charging devices",
-    types: ["tv", "laptop", "charger"],
-  },
-];
+import {
+  canScheduleAgentMessage,
+  getAgentAction,
+  getAgentResult,
+  getRequestedScheduleTimeText,
+  getTimingPhrase,
+  isAddDeviceRequest,
+  normalizeScheduleTimeInput,
+  parseScheduledFor,
+} from "../features/devices/agentUtils";
 
 export default function SmartControl() {
   const [devices, setDevices] = useState([]);
@@ -210,37 +63,80 @@ export default function SmartControl() {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [seasonalMode, setSeasonalMode] = useState("manual");
+  const [seasonalMenuOpen, setSeasonalMenuOpen] = useState(false);
+  const [tourSeasonalOpen, setTourSeasonalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Daily Essentials");
   const [openUnitMenu, setOpenUnitMenu] = useState(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentMessage, setAgentMessage] = useState("");
+  const [agentEvents, setAgentEvents] = useState([]);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState("");
+  const [agentChoice, setAgentChoice] = useState(null);
+  const [agentIntent, setAgentIntent] = useState("");
+  const [agentTargetName, setAgentTargetName] = useState("device");
+  const [agentTargetType, setAgentTargetType] = useState("");
+  const [hideScheduleLoadingPanel, setHideScheduleLoadingPanel] = useState(false);
+  const [scheduleComposerOpen, setScheduleComposerOpen] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [agentSubmittedMessage, setAgentSubmittedMessage] = useState("");
+  const agentRunIdRef = useRef(0);
+  const dismissedAgentRunIdRef = useRef(0);
+  const scheduledTimersRef = useRef([]);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
-    fetchDevices()
-      .then((result) => {
-        const nextDevices = withHouseholdDefaults(result ?? []);
-        setDevices(nextDevices);
-        const preferredSelections = getPreferredSelections(nextDevices);
-        setSelectedByType(
-          Object.fromEntries(
-            Object.entries(preferredSelections).map(([type, device]) => [type, device.id])
-          )
-        );
-      })
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    const onTourStep = (event) => {
+      const { target, openDropdown } = event.detail ?? {};
+      setTourSeasonalOpen(Boolean(openDropdown && target === "device-seasonal-mode"));
+    };
+
+    window.addEventListener("volt-guided-tour-step", onTourStep);
+    return () => window.removeEventListener("volt-guided-tour-step", onTourStep);
+  }, []);
+
+  const agentResult = getAgentResult(agentEvents, agentIntent, agentTargetName, agentTargetType);
+  const scheduleButtonEnabled = canScheduleAgentMessage(agentMessage);
+  const { notify, markAllRead } = useNotifications();
+
+  const loadDevices = () =>
+    fetchDevices().then((result) => {
+      const nextDevices = withHouseholdDefaults(result ?? []);
+      setDevices(nextDevices);
+      const preferredSelections = getPreferredSelections(nextDevices);
+      setSelectedByType(
+        Object.fromEntries(
+          Object.entries(preferredSelections).map(([type, device]) => [type, device.id])
+        )
+      );
+      return nextDevices;
+    });
+
+  useEffect(() => {
+    loadDevices()
       .catch((err) => setError(err.message || "Unable to load devices."))
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (!successMessage) return undefined;
-    const timer = window.setTimeout(() => setSuccessMessage(""), 3000);
-    return () => window.clearTimeout(timer);
-  }, [successMessage]);
+  useEffect(() => () => {
+    scheduledTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    scheduledTimersRef.current = [];
+  }, []);
 
   useEffect(() => {
-    setOpenUnitMenu(null);
-    setPendingDeleteId(null);
+    const timer = window.setTimeout(() => {
+      setOpenUnitMenu(null);
+      setPendingDeleteId(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [activeCategory, page]);
 
   useEffect(() => {
@@ -253,6 +149,35 @@ export default function SmartControl() {
     document.addEventListener("mousedown", closeOpenMenu);
     return () => document.removeEventListener("mousedown", closeOpenMenu);
   }, []);
+
+  const queueScheduledNotification = (response) => {
+    // Backend returns { name, scheduled_state, scheduled_for, ... } at the top level
+    const deviceName = response?.name;
+    if (!response?.scheduled_for || !deviceName || !response?.scheduled_state) return;
+
+    const scheduledDate = parseScheduledFor(response.scheduled_for_iso ?? response.scheduled_for);
+    if (!scheduledDate) return;
+
+    const delayMs = Math.max(0, scheduledDate.getTime() - new Date().getTime());
+    const scheduledState = String(response.scheduled_state).toLowerCase();
+    const timerId = window.setTimeout(async () => {
+      // Always notify — the backend has already updated the DB by now.
+      notify({
+        type: "success",
+        title: `${deviceName} turned ${scheduledState}`,
+        message: "Scheduled device action completed.",
+      });
+      // Only refresh the device list if the component is still mounted.
+      if (mountedRef.current) {
+        await loadDevices().catch((loadError) => {
+          console.error(loadError);
+        });
+      }
+      scheduledTimersRef.current = scheduledTimersRef.current.filter((id) => id !== timerId);
+    }, delayMs);
+
+    scheduledTimersRef.current = [...scheduledTimersRef.current, timerId];
+  };
 
   const toggleDevice = async (id, currentStatus) => {
     const newStatus = currentStatus === "ON" ? "OFF" : "ON";
@@ -283,10 +208,259 @@ export default function SmartControl() {
     }
   };
 
+  const executeAgentMessage = async (message, intent = "", options = {}) => {
+    if (!message.trim()) return;
+
+    if (!options.hideLoadingPanel) {
+      setAgentEvents([]);
+      setAgentError("");
+      setAgentIntent(intent);
+      setAgentTargetName(options.targetName ?? getMentionedDeviceType(message) ?? "device");
+      setAgentTargetType(options.targetType ?? getMentionedDeviceType(message) ?? "");
+      setAgentLoading(true);
+    }
+    const runId = ++agentRunIdRef.current;
+    setAgentSubmittedMessage(message);
+    setHideScheduleLoadingPanel(Boolean(options.hideLoadingPanel));
+
+    let localEvents = [];
+
+    try {
+      await runDeviceAgent(message, {
+        onEvent: (agentEvent) => {
+          if (agentRunIdRef.current !== runId) return;
+          localEvents.push(agentEvent);
+          if (dismissedAgentRunIdRef.current !== runId) {
+            setAgentEvents((current) => [...current, agentEvent]);
+          }
+          if (agentEvent.event === "tool_call" && agentEvent.data?.name === "toggle_device") {
+            const device_id = agentEvent.data.args?.device_id;
+            const newStatus = agentEvent.data.args?.state;
+            if (device_id && (newStatus === "ON" || newStatus === "OFF")) {
+              setDevices((prev) => {
+                const nextDevices = prev.map((d) => (d.id === device_id ? { ...d, status: newStatus } : d));
+                const toggledDevice = nextDevices.find((device) => device.id === device_id);
+                if (toggledDevice) {
+                  const type = getDeviceType(toggledDevice);
+                  const runningDevice = nextDevices.find(
+                    (device) => getDeviceType(device) === type && device.status === "ON"
+                  );
+                  setSelectedByType((selected) => ({
+                    ...selected,
+                    [type]: runningDevice?.id ?? toggledDevice.id,
+                  }));
+                }
+                return nextDevices;
+              });
+            }
+          }
+          if (agentEvent.event === "tool_response") {
+            if (agentEvent.data?.name === "schedule_device_toggle") {
+              queueScheduledNotification(agentEvent.data.response);
+            }
+          }
+          if (agentEvent.event === "error") {
+            setAgentError(agentEvent.data?.message ?? "The device agent is unavailable right now.");
+          }
+        },
+      });
+      await loadDevices();
+      
+      const result = getAgentResult(localEvents, intent, options.targetName ?? getMentionedDeviceType(message) ?? "device", options.targetType ?? "");
+      console.log("Agent result:", result);
+      console.log("Local events:", localEvents);
+      
+      if (result.isDone && !result.isError) {
+        // Use the backend's message if available, otherwise construct one
+        let finalText;
+        
+        if (result.action === "SCHEDULE") {
+          const userTimeText = getRequestedScheduleTimeText(message);
+          const timePrefix = userTimeText.startsWith("in ") ? "" : "at ";
+          const timeDisplay = userTimeText !== "the requested time" ? `${timePrefix}${userTimeText}` : `at ${result.scheduledFor}`;
+          finalText = `${result.finalDeviceName} scheduled to turn ${String(result.scheduledState ?? "").toLowerCase()} ${timeDisplay}.`;
+        } else if (result.errorMessage) {
+          // Use backend's message (includes "already ON/OFF" messages)
+          console.log("Using backend message:", result.errorMessage);
+          finalText = result.errorMessage;
+        } else {
+          // Fallback to constructed message
+          console.log("Using fallback message");
+          finalText = `${result.finalDeviceName} ${
+            result.action === "OFF" ? "turned off" : result.action === "ON" ? "turned on" : "updated"
+          } successfully.`;
+        }
+        
+        console.log("Final notification text:", finalText);
+        notify({
+          type: "success",
+          title: "Action Completed",
+          message: finalText,
+          silent: true,
+        });
+      }
+    } catch (err) {
+      setAgentError(err.message || "Unable to run device agent.");
+      // Revert optimistic update on error
+      await loadDevices();
+    } finally {
+      if (dismissedAgentRunIdRef.current === runId) {
+        dismissedAgentRunIdRef.current = 0;
+      }
+      setAgentLoading(false);
+    }
+  };
+
+  const dispatchAgentMessage = async (trimmedMessage, intent = "", options = {}) => {
+    if (!trimmedMessage) return;
+
+    if (isAddDeviceRequest(trimmedMessage)) {
+      setAgentEvents([]);
+      setAgentChoice(null);
+      setAgentIntent("");
+      setAgentTargetName("device");
+      setAgentSubmittedMessage("");
+      setHideScheduleLoadingPanel(false);
+      setAgentError("Use the Add Device button to add devices. This agent only turns devices on, off, or schedules them.");
+      return;
+    }
+
+    const action = getAgentAction(trimmedMessage);
+    const mentionedType = getMentionedDeviceType(trimmedMessage);
+    const devicesForType = mentionedType
+      ? devices.filter((device) => getDeviceType(device) === mentionedType)
+      : [];
+
+    let targetDevice = null;
+    if (devicesForType.length === 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
+      targetDevice = devicesForType[0];
+    } else if (devicesForType.length > 0) {
+      const specifiedDevices = devicesForType.filter(d => messageSpecifiesDevice(trimmedMessage, [d]));
+      if (specifiedDevices.length === 1) {
+        targetDevice = specifiedDevices[0];
+      }
+    }
+
+    const timingPhrase = getTimingPhrase(trimmedMessage);
+    if (action && targetDevice) {
+      if (targetDevice.status === action) {
+        setAgentEvents([{ event: "answer", data: { answer: `The ${canonicalizeDeviceName(targetDevice)} is already ${action}.` } }]);
+        setAgentChoice(null);
+        setAgentIntent(action);
+        setAgentTargetName(canonicalizeDeviceName(targetDevice));
+        setAgentTargetType(getDeviceType(targetDevice));
+        setAgentLoading(false);
+        setAgentMessage("");
+        return;
+      }
+    }
+
+    if (!action || !mentionedType) {
+      setAgentEvents([]);
+      setAgentChoice(null);
+      setAgentIntent("");
+      setAgentTargetName("device");
+      setAgentSubmittedMessage("");
+      setHideScheduleLoadingPanel(false);
+      setAgentError("Tell me which device to turn on or off, like Turn on the AC.");
+      return;
+    }
+
+    if (action && mentionedType && devicesForType.length > 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
+      setAgentEvents([]);
+      setAgentError("");
+      setAgentIntent(intent);
+      setAgentTargetName(mentionedType);
+      setHideScheduleLoadingPanel(Boolean(options.hideLoadingPanel));
+      setAgentChoice({
+        action,
+        type: mentionedType,
+        devices: devicesForType,
+        timingText: getTimingPhrase(trimmedMessage),
+      });
+      return;
+    }
+
+    await executeAgentMessage(trimmedMessage, intent, options);
+  };
+
+  const runAgent = async (event) => {
+    event.preventDefault();
+    setScheduleComposerOpen(false);
+    const trimmedMessage = agentMessage.trim();
+    await dispatchAgentMessage(trimmedMessage, getAgentAction(trimmedMessage), {
+      hideLoadingPanel: false,
+      targetName: getMentionedDeviceType(trimmedMessage) ?? "device",
+    });
+  };
+
+  const scheduleAgent = async () => {
+    const trimmedMessage = agentMessage.trim();
+    if (!trimmedMessage || !scheduleButtonEnabled) return;
+
+    const timingPhrase = getTimingPhrase(trimmedMessage);
+    if (!timingPhrase && !scheduleComposerOpen) {
+      setScheduleComposerOpen(true);
+      setAgentError("");
+      return;
+    }
+
+    const normalizedScheduleTime = normalizeScheduleTimeInput(scheduleTime);
+    if (!timingPhrase && !normalizedScheduleTime) {
+      setAgentError("Add a schedule time, like in 10 secs or at 11:55 AM.");
+      return;
+    }
+
+    const scheduledMessage = timingPhrase ? trimmedMessage : `${trimmedMessage} ${normalizedScheduleTime}`;
+    setScheduleComposerOpen(false);
+    setAgentError("");
+    setScheduleTime("");
+    await dispatchAgentMessage(scheduledMessage, "SCHEDULE", {
+      hideLoadingPanel: false,
+      targetName: getMentionedDeviceType(trimmedMessage) ?? "device",
+    });
+  };
+
+  const runAgentForDevice = (device) => {
+    const actionText = agentChoice?.action === "OFF" ? "Turn off" : "Turn on";
+    const timingText = agentChoice?.timingText ? ` ${agentChoice.timingText}` : "";
+
+    if (device.status === agentChoice?.action) {
+      setAgentEvents([{ event: "answer", data: { answer: `The ${canonicalizeDeviceName(device)} is already ${agentChoice.action}.` } }]);
+      setAgentChoice(null);
+      setAgentIntent(agentChoice.action);
+      setAgentTargetName(canonicalizeDeviceName(device));
+      setAgentTargetType(getDeviceType(device));
+      setAgentLoading(false);
+      return;
+    }
+
+    executeAgentMessage(`${actionText} ${device.id}${timingText}`, agentIntent, {
+      hideLoadingPanel: false,
+      targetName: canonicalizeDeviceName(device),
+      targetType: getDeviceType(device),
+    });
+  };
+
+  const clearAgentResult = () => {
+    if (!agentLoading) {
+      agentRunIdRef.current++;
+    } else {
+      dismissedAgentRunIdRef.current = agentRunIdRef.current;
+    }
+    setAgentOpen(false);
+    setAgentEvents([]);
+    setAgentError("");
+    setAgentChoice(null);
+    setAgentIntent("");
+    setAgentTargetName("device");
+    setAgentSubmittedMessage("");
+    setHideScheduleLoadingPanel(false);
+  };
+
   const beginAdd = (type = "AC") => {
     const normalizedType = canonicalizeDeviceType(type);
     const count = devices.filter((device) => getDeviceType(device) === normalizedType).length + 1;
-    setSuccessMessage("");
     setEditingId("new");
     setForm({
       type: normalizedType,
@@ -354,12 +528,20 @@ export default function SmartControl() {
       const created = await createDevice(payload);
       setDevices((prev) => [...prev, created]);
       setSelectedByType((prev) => ({ ...prev, [getDeviceType(created)]: created.id }));
-      setSuccessMessage("Device added successfully.");
+      notify({
+        type: "success",
+        title: "Device added",
+        message: `${canonicalizeDeviceName(created)} is now available in Smart Control.`,
+      });
     } else {
       const updated = await updateDevice(editingId, payload);
       setDevices((prev) => prev.map((device) => (device.id === editingId ? updated : device)));
       setSelectedByType((prev) => ({ ...prev, [getDeviceType(updated)]: updated.id }));
-      setSuccessMessage("Device updated successfully.");
+      notify({
+        type: "success",
+        title: "Device updated",
+        message: `${canonicalizeDeviceName(updated)} settings were saved.`,
+      });
     }
 
     setEditingId(null);
@@ -389,7 +571,11 @@ export default function SmartControl() {
 
     try {
       await deleteDevice(device.id);
-      setSuccessMessage("Device removed successfully.");
+      notify({
+        type: "success",
+        title: "Device removed",
+        message: `${canonicalizeDeviceName(device)} was removed from Smart Control.`,
+      });
     } catch (deleteError) {
       console.error(deleteError);
       setDevices(previousDevices);
@@ -401,7 +587,13 @@ export default function SmartControl() {
           ])
         )
       );
-      setError(deleteError.message || "Unable to remove device.");
+      const message = deleteError.message || "Unable to remove device.";
+      setError(message);
+      notify({
+        type: "error",
+        title: "Device removal failed",
+        message,
+      });
     }
   };
 
@@ -462,16 +654,6 @@ export default function SmartControl() {
             <h1 className="font-display text-2xl font-bold text-white">Smart Control</h1>
             <p className="text-zinc-400 mt-1">Manage your home appliances remotely</p>
           </div>
-          <div data-tour="device-stats" className="flex gap-3">
-            <div className="flex h-20 min-w-[150px] flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900 px-5 shadow-sm">
-              <p className="text-xs text-zinc-500 font-medium uppercase">Active Devices</p>
-              <p className="text-lg font-bold text-white">{activeCount} / {devices.length}</p>
-            </div>
-            <div className="flex h-20 min-w-[150px] flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900 px-5 shadow-sm">
-              <p className="text-xs text-zinc-500 font-medium uppercase">Current Load</p>
-              <p className="text-lg font-bold text-[var(--volt-yellow)]">{totalPower} W</p>
-            </div>
-          </div>
         </div>
         
       </div>
@@ -522,16 +704,9 @@ export default function SmartControl() {
         </form>
       )}
 
-      {successMessage ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4 text-sm font-bold text-emerald-300">
-          <CheckCircle2 size={20} />
-          <span>{successMessage}</span>
-        </div>
-      ) : null}
-
       <div className="space-y-4">
-        <div data-tour="device-controls" className="flex flex-col gap-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div data-tour="device-categories" className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2">
             {sectionedDeviceGroups.map((section) => (
               <button
                 key={section.title}
@@ -552,16 +727,23 @@ export default function SmartControl() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <VoltSelect
-              value={seasonalMode}
-              onChange={applySeasonalMode}
-              options={seasonalOptions}
-              ariaLabel="Seasonal mode"
-              title={seasonalModes[seasonalMode].helper}
-              className="min-w-[220px]"
-            />
+            <div data-tour="device-seasonal-mode" className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2">
+              <VoltSelect
+                value={seasonalMode}
+                onChange={applySeasonalMode}
+                options={seasonalOptions}
+                ariaLabel="Seasonal mode"
+                title={seasonalModes[seasonalMode].helper}
+                className="min-w-[220px]"
+                open={tourSeasonalOpen || seasonalMenuOpen}
+                onOpenChange={(next) => {
+                  if (!tourSeasonalOpen) setSeasonalMenuOpen(next);
+                }}
+              />
+            </div>
             <button
               type="button"
+              data-tour="device-add"
               onClick={() => beginAdd()}
               className="flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-4 text-sm font-bold text-[var(--volt-yellow)] transition-colors hover:bg-[rgba(234,179,8,0.22)]"
             >
@@ -569,6 +751,202 @@ export default function SmartControl() {
             </button>
           </div>
         </div>
+
+        {/* NEW INLINE AGENT & STATS SECTION */}
+        <div className="flex flex-col gap-4 xl:flex-row">
+          <div className="flex-1 rounded-2xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] p-5 shadow-sm relative overflow-hidden group">
+            <div className="absolute -top-12 -right-12 p-3 opacity-10 transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-12">
+              <Bot size={180} />
+            </div>
+            <div className="relative z-10">
+              <h2 className="font-display text-sm font-bold text-[var(--volt-yellow)] uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--volt-yellow)] text-black"><Bot size={16} /></span>
+                VoltStream Agent
+              </h2>
+              <form onSubmit={runAgent} className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  value={agentMessage}
+                  onChange={(event) => {
+                    setAgentMessage(event.target.value);
+                    setAgentChoice(null);
+                    setAgentIntent("");
+                    setAgentTargetName("device");
+                    setAgentSubmittedMessage("");
+                    setHideScheduleLoadingPanel(false);
+                    setAgentError("");
+                  }}
+                  placeholder="Turn off the AC or schedule a device..."
+                  className="min-h-[50px] flex-1 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-5 py-3 text-sm font-semibold text-white outline-none transition-all placeholder:text-[var(--volt-yellow)]/50 focus:border-[var(--volt-yellow)] focus:bg-black/60 focus:shadow-[0_0_24px_rgba(234,179,8,0.15)]"
+                />
+                <button
+                  type="submit"
+                  disabled={agentLoading}
+                  className="flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-[var(--volt-yellow)] px-6 text-sm font-bold text-black transition-all hover:brightness-110 hover:shadow-[0_4px_16px_rgba(234,179,8,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Send size={18} />
+                  {agentLoading ? "Running" : "Go"}
+                </button>
+                <button
+                  type="button"
+                  onClick={scheduleAgent}
+                  disabled={agentLoading || !scheduleButtonEnabled}
+                  className="flex min-h-[50px] items-center justify-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-5 text-sm font-bold text-[var(--volt-yellow)] transition-all hover:bg-[var(--volt-yellow)] hover:text-black disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
+                >
+                  <CalendarClock size={18} />
+                  Schedule
+                </button>
+              </form>
+
+              {scheduleComposerOpen ? (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row max-w-md bg-black/30 p-2 rounded-xl border border-[var(--volt-yellow-border)]/50 backdrop-blur-sm">
+                  <input
+                    value={scheduleTime}
+                    onChange={(event) => {
+                      setScheduleTime(event.target.value);
+                      setAgentError("");
+                    }}
+                    placeholder="e.g. in 10 secs, or at 11:55 AM"
+                    className="min-h-[44px] flex-1 rounded-lg bg-transparent px-3 py-2 text-sm font-semibold text-[var(--volt-yellow)] outline-none placeholder:text-[var(--volt-yellow)]/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={scheduleAgent}
+                    disabled={agentLoading || !scheduleTime.trim()}
+                    className="min-h-[44px] rounded-lg bg-[var(--volt-yellow)] px-5 text-sm font-bold text-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Confirm Time
+                  </button>
+                </div>
+              ) : null}
+
+
+            </div>
+          </div>
+
+          <div data-tour="device-stats" className="flex gap-4 shrink-0 overflow-x-auto pb-2 xl:pb-0">
+            <div className="flex flex-col justify-center rounded-2xl border border-zinc-800 bg-zinc-900 px-7 py-5 min-w-[170px] xl:min-w-[190px] shadow-sm relative overflow-hidden group">
+              <div className="absolute right-0 bottom-0 opacity-5 p-3 text-emerald-400 transition-transform duration-500 group-hover:scale-125"><CheckCircle2 size={64}/></div>
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2 relative z-10">Active Devices</p>
+              <p className="text-4xl font-display font-bold text-white tracking-tight relative z-10">{activeCount} <span className="text-lg text-zinc-600 font-medium">/ {devices.length}</span></p>
+            </div>
+            <div className="flex flex-col justify-center rounded-2xl border border-zinc-800 bg-zinc-900 px-7 py-5 min-w-[170px] xl:min-w-[190px] shadow-sm relative overflow-hidden group">
+              <div className="absolute right-0 bottom-0 opacity-5 p-3 text-[var(--volt-yellow)] transition-transform duration-500 group-hover:scale-125"><Zap size={64}/></div>
+              <p className="text-xs text-[var(--volt-yellow)]/60 font-bold uppercase tracking-wider mb-2 relative z-10">Current Load</p>
+              <p className="text-4xl font-display font-bold text-[var(--volt-yellow)] tracking-tight relative z-10">{totalPower} <span className="text-lg text-[var(--volt-yellow)]/60 font-medium">W</span></p>
+            </div>
+          </div>
+        </div>
+
+        {(agentChoice || agentError || (hideScheduleLoadingPanel ? agentResult.isDone : agentLoading || agentEvents.length > 0)) && (
+          <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200"
+          >
+            <div className="w-full max-w-md rounded-2xl border border-[var(--volt-yellow-border)] bg-[#1a1810]/95 p-5 shadow-[0_16px_48px_-12px_rgba(234,179,8,0.3)] relative animate-in zoom-in-95 duration-200">
+               {agentChoice ? (
+                  <div>
+                    <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--volt-yellow)] text-black font-extrabold">?</span> 
+                      Which {agentChoice.type} should I {agentChoice.action === "OFF" ? "turn off" : "turn on"}
+                      {agentChoice.timingText ? ` ${agentChoice.timingText}` : ""}?
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {agentChoice.devices.map((device) => {
+                        const ChoiceIcon = getTypeConfig(getDeviceType(device)).icon;
+                        return (
+                          <button
+                            key={device.id}
+                            type="button"
+                            onClick={() => runAgentForDevice(device)}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-3 py-2 text-left transition-all hover:bg-[var(--volt-yellow)] hover:text-black hover:scale-[1.02]"
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/30">
+                                <ChoiceIcon size={16} />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-bold">{canonicalizeDeviceName(device)}</span>
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    {(() => {
+                      const hasError = !!agentError || !!agentResult.errorMessage || !!agentResult.isError;
+                      const showAsDone = agentResult.isDone && !hasError;
+                      
+                      const IconComp = hasError 
+                        ? XCircle 
+                        : getTypeConfig(agentResult.deviceType ?? agentTargetType ?? "device").icon;
+
+                      let finalText = agentResult.answerText;
+                      if (hasError) {
+                        finalText = agentError || agentResult.errorMessage || `Failed to turn ${agentIntent} device.`;
+                      } else if (showAsDone) {
+                        if (agentResult.action === "SCHEDULE") {
+                          const userTimeText = getRequestedScheduleTimeText(agentSubmittedMessage);
+                          const actualAction = getAgentAction(agentSubmittedMessage || agentMessage)?.toLowerCase() || "off";
+                          finalText = userTimeText
+                            ? `${agentTargetName} scheduled to turn ${actualAction} ${userTimeText}.`
+                            : `${agentTargetName} scheduled to turn ${actualAction}.`;
+                        } else {
+                          finalText = agentResult.answer || `${agentTargetName} turned ${agentIntent.toLowerCase()} successfully.`;
+                        }
+                      }
+
+                      return (
+                        <>
+                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+                            showAsDone ? 'bg-[var(--volt-yellow)] text-black shadow-md' :
+                            hasError ? 'bg-red-500/10 text-red-500' :
+                            'bg-zinc-800 text-[var(--volt-yellow)]'
+                          }`}>
+                            <IconComp 
+                              size={24} 
+                              className={(!showAsDone && !hasError) ? "animate-spin" : ""} 
+                              style={(!showAsDone && !hasError) ? { animationDuration: "2s" } : {}} 
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0 pr-2">
+                            {showAsDone || hasError ? (
+                              <p className={`text-sm font-bold leading-tight ${hasError ? 'text-red-400' : 'text-white'}`}>
+                                {finalText}
+                              </p>
+                            ) : (
+                              <p className="text-sm font-semibold text-[var(--volt-yellow)] opacity-90 tracking-wide animate-pulse">
+                                {(() => {
+                                  const actionText = agentIntent === "SCHEDULE" 
+                                    ? "Scheduling" 
+                                    : agentIntent === "OFF" 
+                                      ? "Turning off" 
+                                      : agentIntent === "ON"
+                                        ? "Turning on"
+                                        : "Updating";
+                                  return `${actionText} ${agentTargetName || "device"}...`;
+                                })()}
+                              </p>
+                            )}
+                          </div>
+                          {(showAsDone || hasError) ? (
+                            <button
+                              type="button"
+                              onClick={clearAgentResult}
+                              className="shrink-0 rounded-lg bg-[var(--volt-yellow)] px-5 py-2 text-xs font-bold text-black transition-all hover:brightness-110 hover:shadow-lg"
+                            >
+                              OK
+                            </button>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
 
         {selectedSection ? (
           <section data-tour="device-list" className="rounded-2xl border border-zinc-900">
@@ -615,7 +993,7 @@ export default function SmartControl() {
                 const selectedId = selectedByType[type] ?? group[0]?.id;
                 const device = group.find((item) => item.id === selectedId) ?? group[0];
                 const isOn = device.status === "ON";
-                const toggleLabel = isOn ? "Turn off device" : "Turn on device";
+                const toggleLabel = isOn ? "Turn off" : "Turn on";
                 const runningCount = group.filter((item) => item.status === "ON").length;
                 const runningDevices = group.filter((item) => item.status === "ON");
                 const hasRunningUnit = runningCount > 0;
@@ -643,11 +1021,11 @@ export default function SmartControl() {
                       openUnitMenu === type ? "z-40 overflow-visible" : "overflow-visible"
                     } ${
                       hasRunningUnit 
-                        ? `bg-zinc-900 text-white border-[var(--volt-yellow-border)] ${glowClass}` 
-                        : 'bg-zinc-900 text-white border-zinc-800 shadow-sm hover:border-[var(--volt-yellow-border)]'
+                        ? `bg-zinc-900 text-white border-[var(--volt-yellow-border)] ${glowClass} hover:-translate-y-2 hover:shadow-[0_0_44px_rgba(234,179,8,0.42)] hover:border-[var(--volt-yellow)] hover:scale-[1.01]` 
+                        : 'bg-zinc-900 text-white border-zinc-800 shadow-sm hover:border-[var(--volt-yellow-border)] hover:-translate-y-2 hover:shadow-[0_16px_44px_rgba(0,0,0,0.55),0_0_24px_rgba(234,179,8,0.16)] hover:scale-[1.01]'
                     }`}
                   >
-                    <div className="relative z-10 mb-4 flex items-start justify-between gap-3">
+                    <div className="relative z-30 mb-4 flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${config.tone}`}>
                           <DeviceIcon size={22} />
@@ -659,7 +1037,8 @@ export default function SmartControl() {
                       </div>
                       <ThemedTooltip
                         label={toggleLabel}
-                        tooltipClassName="right-0 left-auto top-auto bottom-full z-[140] mb-3 mt-0 translate-x-0"
+                        className="shrink-0"
+                        tooltipClassName="right-0 left-auto top-full bottom-auto z-40 mt-2 mb-0 translate-x-0"
                       >
                         <button
                           onClick={() => toggleDevice(device.id, device.status)}
@@ -676,7 +1055,7 @@ export default function SmartControl() {
                     </div>
 
                     {group.length > 1 ? (
-                      <div data-unit-menu className="relative z-[70] mb-3">
+                      <div data-unit-menu className="relative z-10 mb-3">
                         <button
                           type="button"
                           onClick={(event) => {
@@ -696,7 +1075,7 @@ export default function SmartControl() {
                           />
                         </button>
                         {openUnitMenu === type && (
-                          <div className="assistant-scrollbar absolute left-0 right-0 top-[calc(100%+8px)] z-[90] max-h-[168px] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_24px_50px_rgba(0,0,0,0.6)] ring-1 ring-black/40">
+                          <div className="assistant-scrollbar absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-[168px] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-zinc-950 shadow-[0_24px_50px_rgba(0,0,0,0.6)] ring-1 ring-black/40">
                             {group.map((item) => {
                               const selected = item.id === device.id;
                               return (
@@ -796,7 +1175,10 @@ export default function SmartControl() {
                           {hasRunningUnit ? `${runningCount} On` : 'Off'}
                         </span>
                         <div className="flex items-center gap-2">
-                          <ThemedTooltip label="Edit device">
+                          <ThemedTooltip
+                            label="Edit device"
+                            tooltipClassName="right-0 left-auto top-auto bottom-full z-[180] mb-2 mt-0 translate-x-0"
+                          >
                             <button
                               type="button"
                               onClick={() => beginEdit(device)}
@@ -806,7 +1188,10 @@ export default function SmartControl() {
                               <Pencil size={15} />
                             </button>
                           </ThemedTooltip>
-                          <ThemedTooltip label="Remove device">
+                          <ThemedTooltip
+                            label="Remove device"
+                            tooltipClassName="right-0 left-auto top-auto bottom-full z-[180] mb-2 mt-0 translate-x-0"
+                          >
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(device.id)}
@@ -830,6 +1215,8 @@ export default function SmartControl() {
           </section>
         ) : null}
       </div>
+
+
     </div>
   );
 }

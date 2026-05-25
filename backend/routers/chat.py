@@ -32,10 +32,10 @@ QA_RESPONSE_EXAMPLE = {
     response_model=ChatResponse,
     responses={200: {"content": {"application/json": {"example": CHAT_RESPONSE_EXAMPLE}}}},
 )
-async def chat(
+def chat(
     request: ChatRequest = Body(
         ...,
-        example={"question": "How does solar reduce my bill?"},
+        examples=[{"question": "How does solar reduce my bill?"}],
     )
 ):
     return answer_chat(request)
@@ -46,10 +46,10 @@ async def chat(
     response_model=ChatResponse,
     responses={200: {"content": {"application/json": {"example": QA_RESPONSE_EXAMPLE}}}},
 )
-async def qa(
+def qa(
     request: ChatRequest = Body(
         ...,
-        example={"question": "Explain the dashboard in simple terms."},
+        examples=[{"question": "Explain the dashboard in simple terms."}],
     )
 ):
     return answer_qa(request)

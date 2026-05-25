@@ -10,6 +10,28 @@ function formatUnits(value) {
   return `${Number(value || 0).toFixed(0)} kWh`;
 }
 
+function formatInvoiceDate(date) {
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function getBillingPeriodStart(month) {
+  const currentDate = new Date();
+  if (!month || month === "Current Month") {
+    return new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  }
+
+  const parsedDate = new Date(`${month} 1`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  }
+
+  return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), 1);
+}
+
 function buildInvoiceDetails(invoice) {
   const generatedBill = Number(invoice.generatedBill || 0);
   const payableBill = Number(invoice.payableBill || 0);
@@ -18,12 +40,14 @@ function buildInvoiceDetails(invoice) {
   const solarUsage = Number(invoice.solarUsage || 0);
   const serviceCharge = Math.max(Math.round(generatedBill * 0.06), 120);
   const energyCharge = Math.max(generatedBill - serviceCharge, 0);
+  const issueDate = getBillingPeriodStart(invoice.month);
+  const dueDate = new Date(issueDate.getFullYear(), issueDate.getMonth() + 1, 1);
 
   return {
     accountName: "Prosumer Household",
     serviceAddress: "VoltStream Smart Home Demo Address",
-    dueDate: "01 June 2026",
-    issueDate: "14 May 2026",
+    dueDate: formatInvoiceDate(dueDate),
+    issueDate: formatInvoiceDate(issueDate),
     lineItems: [
       { label: "Grid energy charge", detail: `${formatUnits(gridUsage)} @ monitored rate`, amount: energyCharge },
       { label: "Smart meter and service", detail: "Monitoring, alerts, and billing support", amount: serviceCharge },

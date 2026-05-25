@@ -2,9 +2,19 @@ import { useEffect } from "react";
 import { BrainCircuit, Lightbulb, PiggyBank, TrendingUp, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-function InsightCard({ icon: Icon, title, children, tone }) {
+function shortenText(value, maxLength = 118) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  const clipped = text.slice(0, maxLength).replace(/\s+\S*$/, "");
+  return `${clipped}.`;
+}
+
+function InsightCard({ icon: Icon, title, children, tone, index = 0 }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/95 p-5">
+    <div
+      className="ai-summary-card rounded-2xl border border-zinc-800 bg-zinc-900/95 p-5 transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:border-zinc-600 hover:shadow-[0_16px_44px_rgba(0,0,0,0.55)]"
+      style={{ "--summary-delay": `${index * 140}ms` }}
+    >
       <div className="mb-4 flex items-center gap-3">
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${tone}`}>
           <Icon size={21} />
@@ -56,9 +66,7 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
             </span>
             <div>
               <h2 className="font-display text-xl font-semibold text-[var(--volt-yellow)]">AI Summary</h2>
-              <p className="text-sm text-zinc-400">
-                Here is a simple breakdown of what happened, how your savings look, and what you can do next in this {period} view.
-              </p>
+              <p className="text-sm text-zinc-400">Quick read for this {period} view.</p>
             </div>
           </div>
           <button
@@ -88,18 +96,20 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
               icon={TrendingUp}
               title="What Happened"
               tone="bg-violet-500/10 text-violet-300 ring-violet-500/20"
+              index={0}
             >
-              <p>{insights.whatHappened}</p>
+              <p>{shortenText(insights.whatHappened)}</p>
             </InsightCard>
 
               <InsightCard
                 icon={PiggyBank}
                 title="Savings"
                 tone="bg-emerald-500/10 text-emerald-300 ring-emerald-500/20"
+                index={1}
               >
-              <p>{insights.billSavings}</p>
+              <p>{shortenText(insights.billSavings)}</p>
               <p className="rounded-xl border border-zinc-800 bg-black/25 px-4 py-3 text-zinc-300">
-                {insights.futureOutlook}
+                {shortenText(insights.futureOutlook, 100)}
               </p>
             </InsightCard>
 
@@ -107,12 +117,13 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
                 icon={Lightbulb}
                 title="What To Do Next"
                 tone="bg-orange-500/10 text-orange-300 ring-orange-500/20"
+                index={2}
               >
               <ul className="space-y-3">
-                {insights.deviceSuggestions.map((item) => (
+                {insights.deviceSuggestions.slice(0, 2).map((item) => (
                   <li key={item} className="flex gap-3">
                     <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--volt-yellow)]" />
-                    <span>{item}</span>
+                    <span>{shortenText(item, 104)}</span>
                   </li>
                   ))}
                 </ul>
@@ -133,7 +144,7 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
                       onClose();
                       navigate("/billing");
                     }}
-                    className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs font-bold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white"
+                    className="rounded-xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-3 py-2 text-xs font-bold text-[var(--volt-yellow)] transition-colors hover:bg-[rgba(234,179,8,0.22)]"
                   >
                     Check Billing
                   </button>
