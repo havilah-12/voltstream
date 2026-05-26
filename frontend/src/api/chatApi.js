@@ -6,6 +6,7 @@ export async function askChatBot(question, files, signal, requestOptions = {}) {
     method: "post",
     data: { question },
     signal,
+    timeout: 30000,
     ...requestOptions,
   });
 }
@@ -15,6 +16,7 @@ export async function askQaBot(question, files, signal, requestOptions = {}) {
     method: "post",
     data: { question },
     signal,
+    timeout: 30000,
     ...requestOptions,
   });
 }

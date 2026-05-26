@@ -19,7 +19,6 @@ def _load_env_file(path: Path) -> None:
 
 
 class Settings(BaseModel):
-    gemini_api_key: str = ""
     gemini_model: str = "models/gemini-2.0-flash"
     gemini_embedding_model: str = "models/gemini-embedding-001"
     chroma_collection_name: str = "voltstream_guide"
@@ -34,7 +33,6 @@ def get_settings() -> Settings:
     _load_env_file(backend_dir / ".env")
 
     return Settings(
-        gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
         gemini_model=os.getenv("GEMINI_MODEL", "") or "models/gemini-2.0-flash",
         gemini_embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "") or "models/gemini-embedding-001",
         chroma_collection_name=os.getenv("CHROMA_COLLECTION_NAME", "") or "voltstream_guide",

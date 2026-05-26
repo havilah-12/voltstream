@@ -1,6 +1,6 @@
 import { apiRequest } from "./client";
 
-const AI_SUMMARY_TIMEOUT_MS = 10000; // extended timeout for reliable LLM response
+const AI_SUMMARY_TIMEOUT_MS = 30000; // extended timeout for Vertex AI response
 
 const summaryCache = new Map();
 
@@ -62,33 +62,19 @@ function buildPrompt({ period, analytics, billing, devices, dashboard }) {
   };
 
   return `
-You are a helpful home energy assistant helping a VoltStream user understand their ${period} energy data.
-
-Use the data below to explain:
-1. what really happened in this ${period} period
-2. what it means for bill savings
-3. what device actions the user should take next
-4. one short future suggestion
+Analyze this ${period} energy data.
 
 Rules:
-- Be specific and practical.
-- Keep each field short, warm, and easy to understand.
-- Use simple everyday words.
-- Avoid sounding technical, analytical, or robotic.
-- Mention real patterns from the data when possible.
-- Focus on savings, solar usage, grid use, and device management.
-- Recommend actions for devices that are currently ON before mentioning OFF devices.
-- Do not suggest running seasonal or OFF devices just because solar is available.
-- If a high-power device is OFF, mention it only as something to keep off unless needed.
-- Do not mention JSON, APIs, databases, or technical internals.
-- Do not use jargon like offset, dependence, consumption profile, or optimization.
-- Prefer phrases like "you used more grid power", "solar helped more", "your bill may go up", or "try running this later in the day".
-- Return valid JSON only in this exact shape:
+1. Be extremely short and direct (under 10 words per point).
+2. Explicitly mention the highest grid usage day.
+3. Use Indian Rupees (₹).
+4. Always give at least 1 device suggestion (prioritize devices currently ON).
+5. Return ONLY this exact JSON format:
 {
-  "whatHappened": "string",
-  "billSavings": "string",
-  "deviceSuggestions": ["string", "string"],
-  "futureOutlook": "string"
+  "whatHappened": ["point 1", "point 2"],
+  "billSavings": ["point 1", "point 2"],
+  "deviceSuggestions": ["point 1", "point 2"],
+  "futureOutlook": "short text"
 }
 
 Data:
@@ -159,8 +145,8 @@ export async function generateUsageInsights({ period, analytics, billing, device
 
     if (
       parsed &&
-      typeof parsed.whatHappened === "string" &&
-      typeof parsed.billSavings === "string" &&
+      Array.isArray(parsed.whatHappened) &&
+      Array.isArray(parsed.billSavings) &&
       Array.isArray(parsed.deviceSuggestions) &&
       typeof parsed.futureOutlook === "string"
     ) {

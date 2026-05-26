@@ -1,8 +1,9 @@
 import json  # Formats SSE data for frontend.
 import logging  # Debug and error logging.
 import os  # Environment variables (API keys, timezone).
+import re
 import threading  # Non-blocking background worker for schedules.
-from datetime import datetime  # Time math for scheduling.
+from datetime import datetime, timedelta  # Time math for scheduling.
 from uuid import uuid4  # Unique IDs for sessions and jobs.
 from zoneinfo import ZoneInfo  # Local timezone support.
 
@@ -59,6 +60,27 @@ def toggle_device(device_id: str, state: str) -> dict:
         return {"status": "error", "message": f"Failed to update {d['name']}."}
     return {"status": "success", "device_id": updated["id"], "name": updated["name"], "updated_status": updated["status"], "message": f"{updated['name']} turned {updated['status']}."}
 
+# Tool: Turns all VoltStream devices ON or OFF
+def toggle_all_devices(state: str) -> dict:
+    """Turn ALL VoltStream devices ON or OFF.
+    
+    Args:
+        state: 'ON' or 'OFF'.
+    """
+    if state not in {"ON", "OFF"}:
+        return {"status": "error", "message": "State must be 'ON' or 'OFF'."}
+    
+    devices = device_service.get_devices()
+    updated_count = 0
+    for d in devices:
+        if d["status"] != state:
+            device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state))
+            updated_count += 1
+            
+    return {
+        "status": "success",
+        "message": f"Successfully turned {state} all devices. {updated_count} devices updated."
+    }
 
 _SCHEDULED_TIMERS: dict[str, threading.Timer] = {}
 _TZ = ZoneInfo(os.getenv("TZ", "Asia/Kolkata"))
@@ -107,6 +129,7 @@ def schedule_device_toggle(device_id: str, state: str, scheduled_time_iso: str) 
         "name": d["name"],
         "scheduled_state": state,
         "scheduled_for": scheduled_at.strftime("%I:%M %p on %Y-%m-%d"),
+        "scheduled_for_iso": scheduled_at.isoformat(),
         "message": f"{d['name']} will turn {state} at {scheduled_at.strftime('%I:%M %p on %Y-%m-%d')}.",
     }
 
@@ -114,9 +137,7 @@ def schedule_device_toggle(device_id: str, state: str, scheduled_time_iso: str) 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
 settings = get_settings()
-os.environ["GOOGLE_API_KEY"] = settings.gemini_api_key
-os.environ.pop("GEMINI_API_KEY", None)
-os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "FALSE")
+os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
 
 _agent = Agent(
     name="voltstream_device_agent",
@@ -137,7 +158,7 @@ _agent = Agent(
         "Scheduled example: 'AC 1 will be turned ON in 10 seconds.'\n"
         "Already in state example: 'AC 1 is already OFF.'"
     ),
-    tools=[get_device_status, toggle_device, schedule_device_toggle],
+    tools=[get_device_status, toggle_device, schedule_device_toggle, toggle_all_devices],
 )
 
 _sessions = InMemorySessionService()
@@ -157,6 +178,31 @@ async def stream_device_agent(message: str):
 
     try:
         now_iso = datetime.now(_TZ).isoformat()
+
+        # Fast path for explicit time scheduling to skip LLM latency
+        match = re.search(r'(?i)turn\s+(on|off)\s+(?:the\s+)?(.+?)\s+in\s+(\d+)\s*(sec|secs|second|seconds|min|mins|minute|minutes)', message)
+        if match:
+            state = match.group(1).upper()
+            device_name = match.group(2).strip()
+            amount = int(match.group(3))
+            unit = match.group(4).lower()
+            
+            d = _find(device_name)
+            if d:
+                secs = amount if unit.startswith('sec') else amount * 60
+                scheduled_at = datetime.now(_TZ) + timedelta(seconds=secs)
+                iso = scheduled_at.isoformat()
+                
+                args = {"device_id": d["id"], "state": state, "scheduled_time_iso": iso}
+                yield _sse("tool_call", {"name": "schedule_device_toggle", "args": args})
+                
+                resp = schedule_device_toggle(d["id"], state, iso)
+                yield _sse("tool_response", {"name": "schedule_device_toggle", "response": resp})
+                
+                yield _sse("answer", {"answer": f"Scheduled {d['name']} to turn {state.lower()}."})
+                yield _sse("done", {"message": "Agent finished."})
+                return
+
         prompt_with_time = f"Current Time (Asia/Kolkata): {now_iso}\nUser Command: {message}"
         
         async for event in _runner.run_async(

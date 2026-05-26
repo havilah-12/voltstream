@@ -35,7 +35,7 @@ export function AiUsageSummaryButton({ period, onClick }) {
       className="inline-flex items-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-4 py-2 text-sm font-bold text-[var(--volt-yellow)] transition-colors hover:bg-[rgba(234,179,8,0.22)]"
     >
       <BrainCircuit size={16} />
-      <span>AI Summary</span>
+      <span>Summary</span>
     </button>
   );
 }
@@ -65,7 +65,7 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
               <BrainCircuit size={21} />
             </span>
             <div>
-              <h2 className="font-display text-xl font-semibold text-[var(--volt-yellow)]">AI Summary</h2>
+              <h2 className="font-display text-xl font-semibold text-[var(--volt-yellow)]">Summary</h2>
               <p className="text-sm text-zinc-400">Quick read for this {period} view.</p>
             </div>
           </div>
@@ -98,18 +98,32 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
               tone="bg-violet-500/10 text-violet-300 ring-violet-500/20"
               index={0}
             >
-              <p>{shortenText(insights.whatHappened)}</p>
+              <ul className="space-y-3">
+                {insights.whatHappened.map((item, idx) => (
+                  <li key={idx} className="flex gap-3">
+                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-violet-400" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </InsightCard>
 
-              <InsightCard
-                icon={PiggyBank}
-                title="Savings"
-                tone="bg-emerald-500/10 text-emerald-300 ring-emerald-500/20"
-                index={1}
-              >
-              <p>{shortenText(insights.billSavings)}</p>
+            <InsightCard
+              icon={PiggyBank}
+              title="Savings"
+              tone="bg-emerald-500/10 text-emerald-300 ring-emerald-500/20"
+              index={1}
+            >
+              <ul className="space-y-3 mb-4">
+                {insights.billSavings.map((item, idx) => (
+                  <li key={idx} className="flex gap-3">
+                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
               <p className="rounded-xl border border-zinc-800 bg-black/25 px-4 py-3 text-zinc-300">
-                {shortenText(insights.futureOutlook, 100)}
+                {insights.futureOutlook}
               </p>
             </InsightCard>
 
@@ -123,7 +137,7 @@ export default function AiUsageSummaryModal({ period, insights, loading, error, 
                 {insights.deviceSuggestions.slice(0, 2).map((item) => (
                   <li key={item} className="flex gap-3">
                     <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--volt-yellow)]" />
-                    <span>{shortenText(item, 104)}</span>
+                    <span>{item}</span>
                   </li>
                   ))}
                 </ul>

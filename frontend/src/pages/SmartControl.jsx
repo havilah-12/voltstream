@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { runDeviceAgent } from "../api/agentApi";
 import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api/devicesApi";
 import VoltSelect from "../components/VoltSelect";
@@ -286,8 +287,9 @@ export default function SmartControl() {
         } else {
           // Fallback to constructed message
           console.log("Using fallback message");
+          const finalAction = (result.action || intent || "").toUpperCase();
           finalText = `${result.finalDeviceName} ${
-            result.action === "OFF" ? "turned off" : result.action === "ON" ? "turned on" : "updated"
+            finalAction === "OFF" ? "turned off" : finalAction === "ON" ? "turned on" : "updated"
           } successfully.`;
         }
         
@@ -343,7 +345,7 @@ export default function SmartControl() {
 
     const timingPhrase = getTimingPhrase(trimmedMessage);
     if (action && targetDevice) {
-      if (targetDevice.status === action) {
+      if (targetDevice.status?.toUpperCase() === action) {
         setAgentEvents([{ event: "answer", data: { answer: `The ${canonicalizeDeviceName(targetDevice)} is already ${action}.` } }]);
         setAgentChoice(null);
         setAgentIntent(action);
@@ -355,14 +357,20 @@ export default function SmartControl() {
       }
     }
 
-    if (!action || !mentionedType) {
-      setAgentEvents([]);
+    const isAll = trimmedMessage.toLowerCase().includes("all");
+    if (action && !mentionedType && !isAll) {
+      setAgentEvents([{ event: "answer", data: { answer: `Please tell me which device you would like to turn ${action.toLowerCase()}.` } }]);
       setAgentChoice(null);
-      setAgentIntent("");
+      setAgentIntent(action);
       setAgentTargetName("device");
-      setAgentSubmittedMessage("");
-      setHideScheduleLoadingPanel(false);
-      setAgentError("Tell me which device to turn on or off, like Turn on the AC.");
+      setAgentTargetType("");
+      setAgentLoading(false);
+      setAgentMessage("");
+      return;
+    }
+
+    if (!action || !mentionedType) {
+      executeAgentMessage(trimmedMessage, intent, options);
       return;
     }
 
@@ -425,7 +433,7 @@ export default function SmartControl() {
     const actionText = agentChoice?.action === "OFF" ? "Turn off" : "Turn on";
     const timingText = agentChoice?.timingText ? ` ${agentChoice.timingText}` : "";
 
-    if (device.status === agentChoice?.action) {
+    if (device.status?.toUpperCase() === agentChoice?.action) {
       setAgentEvents([{ event: "answer", data: { answer: `The ${canonicalizeDeviceName(device)} is already ${agentChoice.action}.` } }]);
       setAgentChoice(null);
       setAgentIntent(agentChoice.action);
@@ -435,6 +443,7 @@ export default function SmartControl() {
       return;
     }
 
+    setAgentChoice(null);
     executeAgentMessage(`${actionText} ${device.id}${timingText}`, agentIntent, {
       hideLoadingPanel: false,
       targetName: canonicalizeDeviceName(device),
@@ -837,7 +846,7 @@ export default function SmartControl() {
           </div>
         </div>
 
-        {(agentChoice || agentError || (hideScheduleLoadingPanel ? agentResult.isDone : agentLoading || agentEvents.length > 0)) && (
+        {(agentChoice || agentError || (hideScheduleLoadingPanel ? agentResult.isDone : agentLoading || agentEvents.length > 0)) && createPortal((
           <div 
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200"
           >
@@ -893,7 +902,11 @@ export default function SmartControl() {
                             ? `${agentTargetName} scheduled to turn ${actualAction} ${userTimeText}.`
                             : `${agentTargetName} scheduled to turn ${actualAction}.`;
                         } else {
-                          finalText = agentResult.answer || `${agentTargetName} turned ${agentIntent.toLowerCase()} successfully.`;
+                          finalText = agentResult.answerText || `${agentTargetName} turned ${agentIntent.toLowerCase()} successfully.`;
+                          const suffix = totalPower >= 1000 ? " Watch out devices!" : "";
+                          if (suffix && !finalText.includes("already") && !finalText.includes("Watch out")) {
+                            finalText = finalText + suffix;
+                          }
                         }
                       }
 
@@ -918,8 +931,9 @@ export default function SmartControl() {
                             ) : (
                               <p className="text-sm font-semibold text-[var(--volt-yellow)] opacity-90 tracking-wide animate-pulse">
                                 {(() => {
+                                  const actualAction = getAgentAction(agentSubmittedMessage || agentMessage)?.toLowerCase() || "off";
                                   const actionText = agentIntent === "SCHEDULE" 
-                                    ? "Scheduling" 
+                                    ? `Scheduling to turn ${actualAction}` 
                                     : agentIntent === "OFF" 
                                       ? "Turning off" 
                                       : agentIntent === "ON"
@@ -946,7 +960,7 @@ export default function SmartControl() {
                 )}
             </div>
           </div>
-        )}
+        ), document.body)}
 
         {selectedSection ? (
           <section data-tour="device-list" className="rounded-2xl border border-zinc-900">

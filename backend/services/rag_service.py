@@ -5,7 +5,7 @@ from services.chroma_service import retrieve_chroma_chunks
 from services.gemini_service import ask_gemini
 
 OUT_OF_SCOPE_ANSWER = "I don't have that information."
-GUIDE_CHUNK_LIMIT = 5
+GUIDE_CHUNK_LIMIT = 3
 
 QA_PROMPT_TEMPLATE = """You are the VoltStream AI Assistant. Answer using ONLY the provided context below.
 
@@ -136,8 +136,14 @@ def _get_sql_context() -> list[str]:
 
 
 def answer_qa(request: ChatRequest) -> ChatResponse:
-    guide_chunks = retrieve_chroma_chunks(request.question, limit=GUIDE_CHUNK_LIMIT)
-    sql_chunks = _get_sql_context()
+    from concurrent.futures import ThreadPoolExecutor
+    # Run Chroma retrieval and SQL context fetching in parallel to save time
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_chroma = executor.submit(retrieve_chroma_chunks, request.question, GUIDE_CHUNK_LIMIT)
+        future_sql = executor.submit(_get_sql_context)
+        guide_chunks = future_chroma.result()
+        sql_chunks = future_sql.result()
+    
     context_chunks = guide_chunks + sql_chunks
     
     if not context_chunks:

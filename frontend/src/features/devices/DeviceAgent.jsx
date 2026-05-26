@@ -128,7 +128,7 @@ export default function DeviceAgent({
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-medium text-white">
-                        {agentResult.action === "SCHEDULE" ? "Scheduling" : agentResult.action === "OFF" ? "Turning off" : "Turning on"} {agentResult.loadingDeviceName}
+                        {agentResult.action === "SCHEDULE_OFF" ? "Scheduling to turn off" : agentResult.action === "SCHEDULE_ON" ? "Scheduling to turn on" : agentResult.action === "OFF" ? "Turning off" : "Turning on"} {agentResult.loadingDeviceName}
                       </p>
                       <p className="text-sm text-zinc-400 mt-1">Please wait...</p>
                     </div>
@@ -165,7 +165,7 @@ export default function DeviceAgent({
                     </div>
                     <div className="text-center">
                       <p className={`text-lg font-medium ${agentError ? "text-red-400" : "text-emerald-400"}`}>
-                        {agentError || (agentResult.isError ? agentResult.errorMessage : "Action completed successfully")}
+                        {agentError || (agentResult.isError ? agentResult.errorMessage : (agentResult.answerText || agentResult.errorMessage || "Action completed successfully"))}
                       </p>
                     </div>
                     <button

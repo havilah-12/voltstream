@@ -94,13 +94,13 @@ export default function NotificationCenter() {
                     <Icon size={18} className={`mt-0.5 shrink-0 ${notification.read ? "text-zinc-700" : config.iconTone}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
-                        <p className={`text-sm font-bold ${notification.read ? "text-zinc-500" : "text-white"}`}>{notification.title}</p>
-                        <span className={`shrink-0 text-[11px] font-semibold ${notification.read ? "text-zinc-700" : "text-zinc-600"}`}>
+                        <p className={`text-sm font-bold ${notification.title === "Action Completed" ? "text-[var(--volt-yellow)]" : notification.read ? "text-zinc-300" : "text-white"}`}>{notification.title}</p>
+                        <span className={`shrink-0 text-[11px] font-semibold ${notification.read ? "text-zinc-500" : "text-zinc-400"}`}>
                           {formatNotificationTime(notification.createdAt)}
                         </span>
                       </div>
                       {notification.message ? (
-                        <p className={`mt-1 text-xs font-semibold leading-5 ${notification.read ? "text-zinc-600" : "text-zinc-400"}`}>{notification.message}</p>
+                        <p className={`mt-1 text-xs font-semibold leading-5 ${notification.read ? "text-zinc-400" : "text-white"}`}>{notification.message}</p>
                       ) : null}
                     </div>
                     <button

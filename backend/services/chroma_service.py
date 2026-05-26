@@ -19,31 +19,27 @@ def _load_document() -> str:
 
 
 class GeminiEmbeddingFunction:
-    def __init__(self, api_key: str, model_name: str):
-        import google.generativeai as genai
+    def __init__(self, model_name: str):
+        from google import genai
 
-        genai.configure(api_key=api_key)
-        self._genai = genai
-        self._model_name = model_name
+        self._client = genai.Client()
+        self._model_name = model_name.removeprefix("models/")
 
     def __call__(self, input):
         texts = [input] if isinstance(input, str) else list(input)
         embeddings = []
         for text in texts:
-            result = self._genai.embed_content(
+            result = self._client.models.embed_content(
                 model=self._model_name,
-                content=text,
-                task_type="semantic_similarity",
+                contents=text,
             )
-            embeddings.append(result["embedding"])
+            embeddings.append(result.embeddings[0].values)
         return embeddings
 
 
 @lru_cache
 def _get_collection():
     settings = get_settings()
-    if not settings.gemini_api_key:
-        return None
 
     try:
         import chromadb
@@ -57,7 +53,6 @@ def _get_collection():
     persist_path.mkdir(parents=True, exist_ok=True)
 
     embedding_function = GeminiEmbeddingFunction(
-        api_key=settings.gemini_api_key,
         model_name=settings.gemini_embedding_model,
     )
     client = chromadb.PersistentClient(path=str(persist_path))
