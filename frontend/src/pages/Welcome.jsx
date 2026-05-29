@@ -6,7 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 const INTRO_REVEAL_COUNT = 2;
 const FEATURE_REVEAL_COUNT = 3;
 const REVEAL_STAGGER_MS = 250;
-const PHASE_HOLD_MS = 300;
+const PHASE_HOLD_MS = 2500;
 
 const nextSteps = [
   {
@@ -82,7 +82,7 @@ export default function Welcome() {
       setRevealInstant(false);
       setTransitionClass("card-animate-enter");
       setIsTransitioning(false);
-    }, 400);
+    }, 650);
   }, []);
 
   const advancePhase = useCallback(() => {

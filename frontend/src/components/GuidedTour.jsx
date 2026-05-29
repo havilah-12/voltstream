@@ -28,13 +28,13 @@ const pageIntroSteps = {
     target: "page-heading",
     title: "Usage History Overview",
     subtitle: "Understand your energy patterns over time",
-    body: "This page shows historical grid and solar data so you can compare usage patterns over time. Switch between daily, weekly, and monthly views and use the AI Summary for a plain-language breakdown of what changed.",
+    body: "This page shows historical grid and solar data so you can compare usage patterns over time. Switch between daily, weekly, and monthly views and use the Smart Manager for a plain-language breakdown of what changed.",
   },
   "/devices": {
     target: "smart-control-heading",
     title: "Smart Control Overview",
     subtitle: "Manage every appliance from one place",
-    body: "This page lets you monitor appliances, see running devices, and control selected units. You can also open the Device Agent to turn devices on, off, or schedule them using plain language commands.",
+    body: "This page lets you monitor appliances, see running devices, and control selected units. You can also use the VoltStream Agent to turn devices on, off, or schedule them using plain language commands.",
   },
   "/billing": {
     target: "page-heading",
@@ -85,16 +85,16 @@ const pageSteps = {
       body: "Switch between daily, weekly, and monthly views to compare usage over time.",
     },
     {
+      target: "history-ai-summary",
+      title: "Smart Manager",
+      subtitle: "Plain-language analysis on demand",
+      body: "Ask the Smart Manager when you want a quick explanation of what changed in this period, how savings look, and what to do next.",
+    },
+    {
       target: "history-summary",
       title: "History Summary",
       subtitle: "Key totals for the selected period",
       body: "These cards show total grid use, solar generated, solar coverage, and the peak grid period.",
-    },
-    {
-      target: "history-ai-summary",
-      title: "AI Summary",
-      subtitle: "Plain-language analysis on demand",
-      body: "Use AI Summary when you want a quick explanation of what changed in this period, how savings look, and what to do next.",
     },
     {
       target: "history-chart",
@@ -104,12 +104,6 @@ const pageSteps = {
     },
   ],
   "/devices": [
-    {
-      target: "device-stats",
-      title: "Device Status",
-      subtitle: "Active count and current load",
-      body: "These cards show how many devices are active and the current load in watts.",
-    },
     {
       target: "device-categories",
       title: "Device Categories",
@@ -134,6 +128,12 @@ const pageSteps = {
       title: "Device Agent",
       subtitle: "Control devices with plain language",
       body: "Tap Device Agent to open the AI-powered control panel. Type commands like 'Turn off the AC' or 'Turn on the fan in 5 minutes' and the agent handles the rest.",
+    },
+    {
+      target: "device-stats",
+      title: "Device Status",
+      subtitle: "Active count and current load",
+      body: "These cards show how many devices are active and the current load in watts.",
     },
     {
       target: "device-list",

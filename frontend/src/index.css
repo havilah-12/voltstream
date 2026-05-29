@@ -675,11 +675,11 @@ select option:focus {
 
 /* 3D Card Transitions: Entry (comes from top) & Exit (goes to bottom) */
 .card-animate-enter {
-  animation: card-come-from-top 0.4s cubic-bezier(0.34, 1.25, 0.64, 1) forwards;
+  animation: card-come-from-top 0.7s cubic-bezier(0.34, 1.25, 0.64, 1) forwards;
 }
 
 .card-animate-exit {
-  animation: card-go-to-bottom 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: card-go-to-bottom 0.65s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .signup-card-animate {

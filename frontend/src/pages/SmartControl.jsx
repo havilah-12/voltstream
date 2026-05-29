@@ -806,7 +806,7 @@ export default function SmartControl() {
 
         {/* NEW INLINE AGENT & STATS SECTION */}
         <div className="flex flex-col gap-4 xl:flex-row">
-          <div className="flex-1 rounded-2xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] p-5 shadow-sm relative overflow-hidden group">
+          <div data-tour="device-agent" className="flex-1 rounded-2xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] p-5 shadow-sm relative overflow-hidden group">
             <div className="absolute -top-12 -right-12 p-3 opacity-10 transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-12">
               <Bot size={180} />
             </div>
