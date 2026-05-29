@@ -11,6 +11,7 @@ VoltStream is a household smart energy monitoring platform that helps users unde
 ### 📊 Energy Monitoring
 - **Live Dashboard**: Real-time grid draw, solar generation, and net usage.
 - **Analytics**: Daily, weekly, and monthly energy consumption trends.
+- **Smart Manager**: A multi-agent AI system that analyzes historical usage and provides personalized, actionable energy-saving advice.
 - **Solar Tracking**: Monitor solar coverage and savings.
 
 ### 🏠 Smart Device Control
@@ -101,7 +102,26 @@ User Input: "How do solar panels work?"
 [Response] ◄── Returns answer to user
 ```
 
-### 4. 🗄️ Database Flow (SQLite)
+### 4. 🕵️ Smart Manager Flow (Multi-Agent System)
+The Smart Manager leverages an Orchestrator Agent that delegates tasks to specialized sub-agents to analyze data and provide tailored energy advice.
+
+```text
+User Request: "How can I reduce my energy bill based on last week's usage?"
+   │
+   ▼
+[Orchestrator Agent] ──► evaluates request and plans execution
+   │
+   ├──► 1. [Analyst Agent] ─► queries SQLite for historical usage data
+   └──► 2. [Advisor Agent] ─► queries ChromaDB vector store for best practices
+   │
+   ▼
+[Orchestrator Agent] ──► synthesizes data and knowledge
+   │
+   ▼
+[Response] ◄── streams comprehensive, personalized analysis back to UI
+```
+
+### 5. 🗄️ Database Flow (SQLite)
 Embedded zero-config database using native python `sqlite3`.
 
 ```text
@@ -128,7 +148,7 @@ Embedded zero-config database using native python `sqlite3`.
 
 *(DB auto-initializes on startup with seed data from `backend/data/seed_db.py`)*
 
-### 5. 🧩 ChromaDB Flow (Vector Initialization)
+### 6. 🧩 ChromaDB Flow (Vector Initialization)
 Handles the startup sequence for creating the vector database used in RAG.
 
 ```text
