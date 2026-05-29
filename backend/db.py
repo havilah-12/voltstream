@@ -33,6 +33,14 @@ def initialize_database() -> None:
                 solar REAL NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS device_analytics_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_name TEXT NOT NULL,
+                period TEXT NOT NULL,
+                label TEXT NOT NULL,
+                consumption_kwh REAL NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS devices (
                 id TEXT PRIMARY KEY,
                 type TEXT NOT NULL,
@@ -70,6 +78,7 @@ def seed_database_if_empty() -> None:
         cursor = connection.cursor()
         has_dashboard = cursor.execute("SELECT 1 FROM dashboard_live WHERE id = 1").fetchone()
         has_history = cursor.execute("SELECT 1 FROM analytics_history LIMIT 1").fetchone()
+        has_device_history = cursor.execute("SELECT 1 FROM device_analytics_history LIMIT 1").fetchone()
         has_devices = cursor.execute("SELECT 1 FROM devices LIMIT 1").fetchone()
         has_billing = cursor.execute("SELECT 1 FROM billing_summary WHERE id = 1").fetchone()
         has_invoices = cursor.execute("SELECT 1 FROM invoice_history LIMIT 1").fetchone()
@@ -99,6 +108,19 @@ def seed_database_if_empty() -> None:
                 VALUES (?, ?, ?, ?)
                 """,
                 rows,
+            )
+
+        if not has_device_history and "device_analytics_history" in mock_db:
+            device_rows = []
+            for period, entries in mock_db["device_analytics_history"].items():
+                for entry in entries:
+                    device_rows.append((entry["device_name"], period, entry["label"], entry["consumption_kwh"]))
+            cursor.executemany(
+                """
+                INSERT INTO device_analytics_history (device_name, period, label, consumption_kwh)
+                VALUES (?, ?, ?, ?)
+                """,
+                device_rows,
             )
 
         if not has_devices:

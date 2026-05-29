@@ -44,8 +44,7 @@ def _fetch_billing_context(connection) -> str | None:
     payable_bill = max(projected_bill - solar_savings, 0)
 
     return (
-        "SQL billing context: "
-        f"current generated bill is Rs.{billing['current_balance']:.0f}, "
+        f"Current generated bill is Rs.{billing['current_balance']:.0f}, "
         f"projected grid bill is Rs.{projected_bill:.0f}, "
         f"budget limit is Rs.{billing['budget_limit']:.0f}, "
         f"grid usage is {grid_usage:.0f} kWh, "
@@ -76,7 +75,6 @@ def _fetch_invoice_history_context(connection) -> str | None:
         for row in rows
     )
     return (
-        "SQL invoice history context: "
         f"{invoice_text}. "
         f"Average historical bill is Rs.{average_amount:.0f}. "
         f"Estimated next bill from invoice history is Rs.{estimated_next_bill:.0f}."
@@ -97,8 +95,7 @@ def _fetch_live_context(connection) -> str | None:
 
     live = dict(row)
     return (
-        "SQL live energy context: "
-        f"grid draw is {live['grid_draw_kw']:.1f} kW, "
+        f"Grid draw is {live['grid_draw_kw']:.1f} kW, "
         f"solar generation is {live['solar_generation_kw']:.1f} kW, "
         f"net usage is {live['net_usage_kw']:.1f} kW."
     )
@@ -120,7 +117,7 @@ def _fetch_device_context(connection) -> str | None:
         f"{row['name']} in {row['location']} is {row['status']} at {row['power_usage_w']} W"
         for row in rows
     ]
-    return "SQL device context: " + "; ".join(devices) + "."
+    return "; ".join(devices) + "."
 
 
 def _get_sql_context() -> list[str]:

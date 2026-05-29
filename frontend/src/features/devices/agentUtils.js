@@ -9,7 +9,7 @@ export function getAgentResult(events, fallbackAction = "", fallbackDeviceName =
   const requestedType = toolCall?.data?.args?.device_type;
   const toolName = toolCall?.data?.name;
   const requestedState = (toolCall?.data?.args?.state ?? updatedDevice?.status ?? fallbackAction).toUpperCase();
-  const action = toolName === "schedule_device_toggle"
+  const action = toolName === "schedule_device"
     ? (requestedState === "OFF" ? "SCHEDULE_OFF" : "SCHEDULE_ON")
     : requestedState;
 

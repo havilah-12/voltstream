@@ -2,7 +2,7 @@
 import { apiRequest } from "./client";
 
 export async function askChatBot(question, files, signal, requestOptions = {}) {
-  return apiRequest("/chat", {
+  return apiRequest("/aibot/chat", {
     method: "post",
     data: { question },
     signal,
@@ -12,7 +12,7 @@ export async function askChatBot(question, files, signal, requestOptions = {}) {
 }
 
 export async function askQaBot(question, files, signal, requestOptions = {}) {
-  return apiRequest("/qa", {
+  return apiRequest("/aibot/qa", {
     method: "post",
     data: { question },
     signal,

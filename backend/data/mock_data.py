@@ -27,6 +27,51 @@ mock_db = {
             {"label": "Apr", "grid": 305, "solar": 255}
         ]
     },
+    "device_analytics_history": {
+        "daily": [
+            {"device_name": "AC 1", "label": "Mon", "consumption_kwh": 3.2},
+            {"device_name": "AC 1", "label": "Tue", "consumption_kwh": 2.8},
+            {"device_name": "AC 1", "label": "Wed", "consumption_kwh": 3.5},
+            {"device_name": "AC 1", "label": "Thu", "consumption_kwh": 3.0},
+            {"device_name": "AC 1", "label": "Fri", "consumption_kwh": 3.4},
+            {"device_name": "AC 1", "label": "Sat", "consumption_kwh": 4.1},
+            {"device_name": "AC 1", "label": "Sun", "consumption_kwh": 3.9},
+            {"device_name": "Water Heater 1", "label": "Mon", "consumption_kwh": 2.5},
+            {"device_name": "Water Heater 1", "label": "Tue", "consumption_kwh": 2.4},
+            {"device_name": "Water Heater 1", "label": "Wed", "consumption_kwh": 2.6},
+            {"device_name": "Water Heater 1", "label": "Thu", "consumption_kwh": 2.5},
+            {"device_name": "Water Heater 1", "label": "Fri", "consumption_kwh": 2.7},
+            {"device_name": "Water Heater 1", "label": "Sat", "consumption_kwh": 3.0},
+            {"device_name": "Water Heater 1", "label": "Sun", "consumption_kwh": 2.8},
+            {"device_name": "Washing Machine 1", "label": "Mon", "consumption_kwh": 0.0},
+            {"device_name": "Washing Machine 1", "label": "Tue", "consumption_kwh": 1.2},
+            {"device_name": "Washing Machine 1", "label": "Wed", "consumption_kwh": 0.0},
+            {"device_name": "Washing Machine 1", "label": "Thu", "consumption_kwh": 0.0},
+            {"device_name": "Washing Machine 1", "label": "Fri", "consumption_kwh": 1.5},
+            {"device_name": "Washing Machine 1", "label": "Sat", "consumption_kwh": 2.0},
+            {"device_name": "Washing Machine 1", "label": "Sun", "consumption_kwh": 0.0}
+        ],
+        "weekly": [
+            {"device_name": "AC 1", "label": "Week 1", "consumption_kwh": 22.5},
+            {"device_name": "AC 1", "label": "Week 2", "consumption_kwh": 24.1},
+            {"device_name": "AC 1", "label": "Week 3", "consumption_kwh": 21.0},
+            {"device_name": "AC 1", "label": "Week 4", "consumption_kwh": 23.9},
+            {"device_name": "Water Heater 1", "label": "Week 1", "consumption_kwh": 18.0},
+            {"device_name": "Water Heater 1", "label": "Week 2", "consumption_kwh": 18.5},
+            {"device_name": "Water Heater 1", "label": "Week 3", "consumption_kwh": 17.5},
+            {"device_name": "Water Heater 1", "label": "Week 4", "consumption_kwh": 18.5}
+        ],
+        "monthly": [
+            {"device_name": "AC 1", "label": "Jan", "consumption_kwh": 85.0},
+            {"device_name": "AC 1", "label": "Feb", "consumption_kwh": 78.0},
+            {"device_name": "AC 1", "label": "Mar", "consumption_kwh": 92.0},
+            {"device_name": "AC 1", "label": "Apr", "consumption_kwh": 90.5},
+            {"device_name": "Water Heater 1", "label": "Jan", "consumption_kwh": 72.0},
+            {"device_name": "Water Heater 1", "label": "Feb", "consumption_kwh": 65.0},
+            {"device_name": "Water Heater 1", "label": "Mar", "consumption_kwh": 75.0},
+            {"device_name": "Water Heater 1", "label": "Apr", "consumption_kwh": 74.0}
+        ]
+    },
     "devices": [
         {"id": "ac-1", "type": "AC", "name": "AC 1", "location": "Bedroom 1", "status": "ON", "power_usage_w": 1500},
         {"id": "ac-2", "type": "AC", "name": "AC 2", "location": "Living Room", "status": "OFF", "power_usage_w": 1500},

@@ -14,6 +14,7 @@ from google.adk.sessions import InMemorySessionService  # Stores conversation me
 from google.genai.types import Content, Part  # Formatting for Google AI API.
 from schemas.device import DeviceStatusUpdate  # Pydantic schema validation.
 from services import device_service  # DB layer for physical device updates.
+from utils.certificates import verify_token  # Certificate verification
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ def _find(query: str) -> dict | None:
         None,
     )
 
+
 # Tool: Acts as the AI's database lookup to fetch the exact device ID and its current ON/OFF status.
 def get_device_status(device_id: str) -> dict:
     """Get the current status of a VoltStream device.
@@ -39,6 +41,8 @@ def get_device_status(device_id: str) -> dict:
     if not d:
         return {"status": "error", "message": f"No device matched '{device_id}'."}
     return {"status": "success", "device_id": d["id"], "name": d["name"], "current_status": d["status"]}
+
+
 
 # Tool: Instantly updates the database to turn a device ON or OFF.
 def toggle_device(device_id: str, state: str) -> dict:
@@ -85,15 +89,9 @@ def toggle_all_devices(state: str) -> dict:
 _SCHEDULED_TIMERS: dict[str, threading.Timer] = {}
 _TZ = ZoneInfo(os.getenv("TZ", "Asia/Kolkata"))
 
-# Tool: Uses a Python background thread to wait silently and update the device at a specific future time.
-def schedule_device_toggle(device_id: str, state: str, scheduled_time_iso: str) -> dict:
-    """Schedule a VoltStream device to turn ON or OFF at a future time.
-
-    Args:
-        device_id: Exact device id from get_device_status — e.g. 'ac-1'.
-        state: 'ON' or 'OFF'.
-        scheduled_time_iso: Future datetime in ISO 8601 format e.g. 2025-05-21T22:00:00.
-    """
+# Internal: Uses a Python background thread to wait silently and update the device at a specific future time.
+def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: str) -> dict:
+    """Internal scheduling logic. Do not expose this directly to the LLM."""
     if state not in {"ON", "OFF"}:
         return {"status": "error", "message": "State must be 'ON' or 'OFF'."}
     d = _find(device_id)
@@ -133,6 +131,23 @@ def schedule_device_toggle(device_id: str, state: str, scheduled_time_iso: str) 
         "message": f"{d['name']} will turn {state} at {scheduled_at.strftime('%I:%M %p on %Y-%m-%d')}.",
     }
 
+# Tool: Validates the dev certificate and then schedules the device toggle.
+def schedule_device(device_id: str, state: str, scheduled_time_iso: str, cert: str) -> dict:
+    """Schedule a VoltStream device to turn ON or OFF at a future time using a valid certificate.
+
+    Args:
+        device_id: Exact device id from get_device_status — e.g. 'ac-1'.
+        state: 'ON' or 'OFF'.
+        scheduled_time_iso: Future datetime in ISO 8601 format e.g. 2025-05-21T22:00:00.
+        cert: Base64-encoded client certificate or token that authorizes this specific action.
+    """
+    try:
+        verify_token(cert, device_id, state, scheduled_time_iso)
+    except PermissionError as e:
+        return {"status": "error", "message": f"Certificate verification failed: {e}"}
+        
+    return _schedule_device_internal(device_id, state, scheduled_time_iso)
+
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
@@ -144,12 +159,14 @@ _agent = Agent(
     model=settings.gemini_model.removeprefix("models/"),
     description="Controls VoltStream smart home devices.",
     instruction=(
-        "Control VoltStream smart home devices using three tools.\n\n"
-        "Step 1 — Always call get_device_status first to get the exact device_id.\n"
-        "Step 2 — Decide which tool to use:\n"
+        "Control VoltStream smart home devices using the provided tools.\n\n"
+        "The current device context (names, IDs, and statuses) is provided in the prompt.\n"
+        "Use this context to directly find the correct 'device_id'.\n"
+        "Step 1 — Decide which tool to use:\n"
         "  • Immediate command ('turn on', 'turn off') → call toggle_device(device_id, state)\n"
-        "  • Timed command ('in X minutes', 'in X seconds', 'at HH:MM') → call schedule_device_toggle(device_id, state, scheduled_time_iso)\n"
-        "    Convert the timing to ISO 8601 using Asia/Kolkata timezone based on the current time provided in the prompt.\n\n"
+        "  • Timed command ('in X minutes', 'in X seconds', 'at HH:MM') → call schedule_device(device_id, state, scheduled_time_iso, cert)\n"
+        "    Convert the timing to ISO 8601 using Asia/Kolkata timezone based on the current time provided in the prompt.\n"
+        "    You MUST use the provided 'client_certificate' from the prompt as the 'cert' parameter.\n\n"
         "Intent mapping:\n"
         "  turn on / start / enable → ON\n"
         "  turn off / stop / disable / shut down → OFF\n\n"
@@ -158,7 +175,7 @@ _agent = Agent(
         "Scheduled example: 'AC 1 will be turned ON in 10 seconds.'\n"
         "Already in state example: 'AC 1 is already OFF.'"
     ),
-    tools=[get_device_status, toggle_device, schedule_device_toggle, toggle_all_devices],
+    tools=[get_device_status, toggle_device, schedule_device, toggle_all_devices],
 )
 
 _sessions = InMemorySessionService()
@@ -179,31 +196,29 @@ async def stream_device_agent(message: str):
     try:
         now_iso = datetime.now(_TZ).isoformat()
 
-        # Fast path for explicit time scheduling to skip LLM latency
-        match = re.search(r'(?i)turn\s+(on|off)\s+(?:the\s+)?(.+?)\s+in\s+(\d+)\s*(sec|secs|second|seconds|min|mins|minute|minutes)', message)
-        if match:
-            state = match.group(1).upper()
-            device_name = match.group(2).strip()
-            amount = int(match.group(3))
-            unit = match.group(4).lower()
+        # We removed the regex fast path entirely.
+        # Now we parse a potential schedule token passed from the frontend, or just prompt.
+        
+        # In a real app, the token would be sent in headers or a separate field.
+        # For simplicity, if the frontend sends a structured JSON with "message" and "token", we can extract it.
+        # If it's a simple string, we will assume the token is embedded or we fall back.
+        
+        # First try parsing message as JSON to see if token is there.
+        client_cert = "none"
+        user_text = message
+        try:
+            payload = json.loads(message)
+            if isinstance(payload, dict):
+                user_text = payload.get("message", message)
+                client_cert = payload.get("token", "none")
+        except Exception:
+            pass
             
-            d = _find(device_name)
-            if d:
-                secs = amount if unit.startswith('sec') else amount * 60
-                scheduled_at = datetime.now(_TZ) + timedelta(seconds=secs)
-                iso = scheduled_at.isoformat()
-                
-                args = {"device_id": d["id"], "state": state, "scheduled_time_iso": iso}
-                yield _sse("tool_call", {"name": "schedule_device_toggle", "args": args})
-                
-                resp = schedule_device_toggle(d["id"], state, iso)
-                yield _sse("tool_response", {"name": "schedule_device_toggle", "response": resp})
-                
-                yield _sse("answer", {"answer": f"Scheduled {d['name']} to turn {state.lower()}."})
-                yield _sse("done", {"message": "Agent finished."})
-                return
-
-        prompt_with_time = f"Current Time (Asia/Kolkata): {now_iso}\nUser Command: {message}"
+        from services.device_service import list_devices
+        devices = list_devices()
+        devices_list_str = ", ".join([f"{d['name']} (id: {d['id']}, status: {d['status']})" for d in devices])
+        
+        prompt_with_time = f"Current Time (Asia/Kolkata): {now_iso}\nClient Certificate: {client_cert}\nDevices Context: {devices_list_str}\nUser Command: {user_text}"
         
         async for event in _runner.run_async(
             user_id="user",

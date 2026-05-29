@@ -212,8 +212,8 @@ export default function AssistantSurface({
                   className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}
                 >
                   {!isUser ? (
-                    <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)]">
-                      <BotMessageSquare size={18} />
+                    <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] shadow-[0_0_15px_rgba(234,179,8,0.1)]">
+                      <BotMessageSquare size={18} className="animate-[pulse_2s_ease-in-out_infinite]" />
                     </div>
                   ) : null}
                   <div
@@ -263,24 +263,25 @@ export default function AssistantSurface({
                   className={inputClasses}
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading || !question.trim()}
-                className={askButtonClasses}
-              >
-                <Send size={18} />
-                Ask
-              </button>
               {loading ? (
                 <button
                   type="button"
+                  title="Stop"
                   onClick={() => stopQuestion(effectiveMode)}
-                  className={stopButtonClasses}
+                  className="flex min-h-12 w-12 items-center justify-center shrink-0 rounded-2xl bg-zinc-800 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-white"
                 >
-                  <Square size={16} fill="currentColor" />
-                  Stop
+                  <div className="h-3.5 w-3.5 rounded-[2px] bg-currentColor" />
                 </button>
-              ) : null}
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!question.trim()}
+                  className={askButtonClasses}
+                >
+                  <Send size={18} />
+                  Ask
+                </button>
+              )}
             </div>
           </form>
         </div>

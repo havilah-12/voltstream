@@ -27,14 +27,11 @@ class GeminiEmbeddingFunction:
 
     def __call__(self, input):
         texts = [input] if isinstance(input, str) else list(input)
-        embeddings = []
-        for text in texts:
-            result = self._client.models.embed_content(
-                model=self._model_name,
-                contents=text,
-            )
-            embeddings.append(result.embeddings[0].values)
-        return embeddings
+        result = self._client.models.embed_content(
+            model=self._model_name,
+            contents=texts,
+        )
+        return [e.values for e in result.embeddings]
 
 
 @lru_cache

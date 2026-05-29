@@ -4,6 +4,7 @@ import { runDeviceAgent } from "../api/agentApi";
 import { createDevice, deleteDevice, fetchDevices, updateDevice, updateDeviceStatus } from "../api/devicesApi";
 import VoltSelect from "../components/VoltSelect";
 import ThemedTooltip from "../components/ThemedTooltip";
+import PageHeader from "../components/PageHeader";
 import { useNotifications } from "../features/notifications/notificationStore";
 import {
   Bot,
@@ -88,6 +89,7 @@ export default function SmartControl() {
   const dismissedAgentRunIdRef = useRef(0);
   const scheduledTimersRef = useRef([]);
   const mountedRef = useRef(true);
+  const agentAbortControllerRef = useRef(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -131,6 +133,20 @@ export default function SmartControl() {
     scheduledTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
     scheduledTimersRef.current = [];
   }, []);
+
+  const prevLoadRef = useRef(0);
+  useEffect(() => {
+    if (devices.length === 0) return;
+    const activeLoad = devices.reduce((sum, d) => d.status === "ON" ? sum + (Number(d.power_usage_w) || 0) : sum, 0);
+    if (activeLoad > 3000 && prevLoadRef.current <= 3000 && prevLoadRef.current > 0) {
+      notify({
+        type: "warning",
+        title: "High Load Alert",
+        message: `Total active load has reached ${activeLoad}W. Consider turning off unused devices.`,
+      });
+    }
+    prevLoadRef.current = activeLoad;
+  }, [devices, notify]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -212,6 +228,19 @@ export default function SmartControl() {
   const executeAgentMessage = async (message, intent = "", options = {}) => {
     if (!message.trim()) return;
 
+    if (intent === "SCHEDULE") {
+      options.hideLoadingPanel = true;
+      options.isOptimisticSchedule = true;
+      const action = getAgentAction(message) || "ON";
+      const targetName = options.targetName ?? getMentionedDeviceType(message) ?? "device";
+      notify({
+        type: "success",
+        title: "Action Completed",
+        message: `${targetName} scheduled to turn ${action.toLowerCase()} successfully.`,
+        silent: true,
+      });
+    }
+
     if (!options.hideLoadingPanel) {
       setAgentEvents([]);
       setAgentError("");
@@ -226,8 +255,12 @@ export default function SmartControl() {
 
     let localEvents = [];
 
+    const payloadToRun = options.jsonPayload ? options.jsonPayload : message;
+
     try {
-      await runDeviceAgent(message, {
+      agentAbortControllerRef.current = new AbortController();
+      await runDeviceAgent(payloadToRun, {
+        signal: agentAbortControllerRef.current.signal,
         onEvent: (agentEvent) => {
           if (agentRunIdRef.current !== runId) return;
           localEvents.push(agentEvent);
@@ -256,7 +289,7 @@ export default function SmartControl() {
             }
           }
           if (agentEvent.event === "tool_response") {
-            if (agentEvent.data?.name === "schedule_device_toggle") {
+            if (agentEvent.data?.name === "schedule_device") {
               queueScheduledNotification(agentEvent.data.response);
             }
           }
@@ -271,26 +304,21 @@ export default function SmartControl() {
       console.log("Agent result:", result);
       console.log("Local events:", localEvents);
       
-      if (result.isDone && !result.isError) {
-        // Use the backend's message if available, otherwise construct one
+      if (result.isDone && !result.isError && !options.isOptimisticSchedule) {
         let finalText;
         
-        if (result.action === "SCHEDULE") {
-          const userTimeText = getRequestedScheduleTimeText(message);
-          const timePrefix = userTimeText.startsWith("in ") ? "" : "at ";
-          const timeDisplay = userTimeText !== "the requested time" ? `${timePrefix}${userTimeText}` : `at ${result.scheduledFor}`;
-          finalText = `${result.finalDeviceName} scheduled to turn ${String(result.scheduledState ?? "").toLowerCase()} ${timeDisplay}.`;
-        } else if (result.errorMessage) {
-          // Use backend's message (includes "already ON/OFF" messages)
-          console.log("Using backend message:", result.errorMessage);
-          finalText = result.errorMessage;
+        if (result.errorMessage) {
+          // Fix for "already ON/OFF": Extract the relevant message
+          // Usually backend returns something like "AC 2 is already OFF."
+          const match = result.errorMessage.match(/(?:The\s+)?(.*) is already (ON|OFF)\.?/i);
+          if (match) {
+            finalText = `${match[1]} was already ${match[2].toUpperCase()}`;
+          } else {
+            finalText = result.errorMessage;
+          }
         } else {
-          // Fallback to constructed message
-          console.log("Using fallback message");
           const finalAction = (result.action || intent || "").toUpperCase();
-          finalText = `${result.finalDeviceName} ${
-            finalAction === "OFF" ? "turned off" : finalAction === "ON" ? "turned on" : "updated"
-          } successfully.`;
+          finalText = `${result.finalDeviceName} IS TURNED ${finalAction} SUCCESSFULLY.`;
         }
         
         console.log("Final notification text:", finalText);
@@ -346,13 +374,19 @@ export default function SmartControl() {
     const timingPhrase = getTimingPhrase(trimmedMessage);
     if (action && targetDevice) {
       if (targetDevice.status?.toUpperCase() === action) {
-        setAgentEvents([{ event: "answer", data: { answer: `The ${canonicalizeDeviceName(targetDevice)} is already ${action}.` } }]);
+        setAgentEvents([{ event: "answer", data: { answer: `${canonicalizeDeviceName(targetDevice)} is already ${action}.` } }]);
         setAgentChoice(null);
         setAgentIntent(action);
         setAgentTargetName(canonicalizeDeviceName(targetDevice));
         setAgentTargetType(getDeviceType(targetDevice));
         setAgentLoading(false);
         setAgentMessage("");
+        notify({
+          type: "success",
+          title: "Action Completed",
+          message: `${canonicalizeDeviceName(targetDevice)} was already ${action.toUpperCase()}`,
+          silent: true,
+        });
         return;
       }
     }
@@ -396,9 +430,18 @@ export default function SmartControl() {
     event.preventDefault();
     setScheduleComposerOpen(false);
     const trimmedMessage = agentMessage.trim();
-    await dispatchAgentMessage(trimmedMessage, getAgentAction(trimmedMessage), {
+    
+    const payloadJson = JSON.stringify({
+      message: trimmedMessage,
+      token: "client-placeholder-cert"
+    });
+
+    const isSchedule = !!getTimingPhrase(trimmedMessage);
+
+    await dispatchAgentMessage(trimmedMessage, isSchedule ? "SCHEDULE" : getAgentAction(trimmedMessage), {
       hideLoadingPanel: false,
       targetName: getMentionedDeviceType(trimmedMessage) ?? "device",
+      jsonPayload: payloadJson,
     });
   };
 
@@ -423,9 +466,16 @@ export default function SmartControl() {
     setScheduleComposerOpen(false);
     setAgentError("");
     setScheduleTime("");
+    
+    const payloadJson = JSON.stringify({
+      message: scheduledMessage,
+      token: "client-placeholder-cert"
+    });
+
     await dispatchAgentMessage(scheduledMessage, "SCHEDULE", {
       hideLoadingPanel: false,
       targetName: getMentionedDeviceType(trimmedMessage) ?? "device",
+      jsonPayload: payloadJson,
     });
   };
 
@@ -657,15 +707,7 @@ export default function SmartControl() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div data-tour="smart-control-heading">
-            <h1 className="font-display text-2xl font-bold text-white">Smart Control</h1>
-            <p className="text-zinc-400 mt-1">Manage your home appliances remotely</p>
-          </div>
-        </div>
-        
-      </div>
+      <PageHeader title="Smart Control" subtitle="Manage your home appliances remotely" />
 
       {editingId && (
         <form onSubmit={saveDevice} className="grid grid-cols-1 gap-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-5 md:grid-cols-6">
@@ -714,29 +756,29 @@ export default function SmartControl() {
       )}
 
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div data-tour="device-categories" className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2">
-            {sectionedDeviceGroups.map((section) => (
-              <button
-                key={section.title}
-                type="button"
-                onClick={() => {
-                  setActiveCategory(section.title);
-                  setPage(1);
-                }}
-                className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
-                  selectedSection?.title === section.title
-                    ? "bg-[var(--volt-yellow)] text-black"
-                    : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
-                }`}
-              >
-                {section.title}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div data-tour="device-categories" className="bg-zinc-900 p-1 rounded-xl inline-flex border border-zinc-800 overflow-x-auto whitespace-nowrap scrollbar-hide max-w-full">
+          {sectionedDeviceGroups.map((section) => (
+            <button
+              key={section.title}
+              type="button"
+              onClick={() => {
+                setActiveCategory(section.title);
+                setPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors shrink-0 ${
+                selectedSection?.title === section.title
+                  ? "bg-[var(--volt-yellow)] text-black shadow-sm"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              }`}
+            >
+              {section.title}
+            </button>
+          ))}
+        </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div data-tour="device-seasonal-mode" className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0">
+          <div data-tour="device-seasonal-mode" className="bg-zinc-900 p-1 rounded-xl inline-flex border border-zinc-800">
               <VoltSelect
                 value={seasonalMode}
                 onChange={applySeasonalMode}
@@ -744,6 +786,7 @@ export default function SmartControl() {
                 ariaLabel="Seasonal mode"
                 title={seasonalModes[seasonalMode].helper}
                 className="min-w-[220px]"
+                buttonClassName="bg-transparent border-none text-sm font-bold text-zinc-300"
                 open={tourSeasonalOpen || seasonalMenuOpen}
                 onOpenChange={(next) => {
                   if (!tourSeasonalOpen) setSeasonalMenuOpen(next);
@@ -754,7 +797,7 @@ export default function SmartControl() {
               type="button"
               data-tour="device-add"
               onClick={() => beginAdd()}
-              className="flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-4 text-sm font-bold text-[var(--volt-yellow)] transition-colors hover:bg-[rgba(234,179,8,0.22)]"
+              className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#282410] px-4 text-sm font-bold text-[#FFD700] transition-colors hover:brightness-110"
             >
               <Plus size={18} /> Add Device
             </button>
@@ -769,7 +812,7 @@ export default function SmartControl() {
             </div>
             <div className="relative z-10">
               <h2 className="font-display text-sm font-bold text-[var(--volt-yellow)] uppercase tracking-wider mb-4 flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--volt-yellow)] text-black"><Bot size={16} /></span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--volt-yellow)] text-black"><Bot size={16} className="animate-[pulse_2s_ease-in-out_infinite]" /></span>
                 VoltStream Agent
               </h2>
               <form onSubmit={runAgent} className="flex flex-col gap-3 sm:flex-row">
@@ -787,14 +830,29 @@ export default function SmartControl() {
                   placeholder="Turn off the AC or schedule a device..."
                   className="min-h-[50px] flex-1 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-5 py-3 text-sm font-semibold text-white outline-none transition-all placeholder:text-[var(--volt-yellow)]/50 focus:border-[var(--volt-yellow)] focus:bg-black/60 focus:shadow-[0_0_24px_rgba(234,179,8,0.15)]"
                 />
-                <button
-                  type="submit"
-                  disabled={agentLoading}
-                  className="flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-[var(--volt-yellow)] px-6 text-sm font-bold text-black transition-all hover:brightness-110 hover:shadow-[0_4px_16px_rgba(234,179,8,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Send size={18} />
-                  {agentLoading ? "Running" : "Go"}
-                </button>
+                {agentLoading ? (
+                  <button
+                    type="button"
+                    title="Stop"
+                    onClick={() => {
+                      agentAbortControllerRef.current?.abort();
+                      setAgentLoading(false);
+                      setAgentEvents([]);
+                    }}
+                    className="flex min-h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-white"
+                  >
+                    <div className="h-3.5 w-3.5 rounded-[2px] bg-currentColor" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!agentMessage.trim()}
+                    className="flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-[var(--volt-yellow)] px-6 text-sm font-bold text-black transition-all hover:brightness-110 hover:shadow-[0_4px_16px_rgba(234,179,8,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Send size={18} />
+                    Go
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={scheduleAgent}
@@ -884,7 +942,7 @@ export default function SmartControl() {
                 ) : (
                   <div className="flex items-center gap-4">
                     {(() => {
-                      const hasError = !!agentError || !!agentResult.errorMessage || !!agentResult.isError;
+                      const hasError = !!agentError || !!agentResult.isError;
                       const showAsDone = agentResult.isDone && !hasError;
                       
                       const IconComp = hasError 
@@ -892,17 +950,22 @@ export default function SmartControl() {
                         : getTypeConfig(agentResult.deviceType ?? agentTargetType ?? "device").icon;
 
                       let finalText = agentResult.answerText;
+                      const actualAction = (getAgentAction(agentSubmittedMessage || agentMessage) || agentIntent || "on").toLowerCase();
+                      
                       if (hasError) {
-                        finalText = agentError || agentResult.errorMessage || `Failed to turn ${agentIntent} device.`;
+                        finalText = agentError || agentResult.errorMessage || `Failed to turn ${actualAction} device.`;
                       } else if (showAsDone) {
                         if (agentResult.action === "SCHEDULE") {
                           const userTimeText = getRequestedScheduleTimeText(agentSubmittedMessage);
-                          const actualAction = getAgentAction(agentSubmittedMessage || agentMessage)?.toLowerCase() || "off";
                           finalText = userTimeText
                             ? `${agentTargetName} scheduled to turn ${actualAction} ${userTimeText}.`
                             : `${agentTargetName} scheduled to turn ${actualAction}.`;
                         } else {
-                          finalText = agentResult.answerText || `${agentTargetName} turned ${agentIntent.toLowerCase()} successfully.`;
+                          finalText = agentResult.answerText || agentResult.errorMessage || `${agentTargetName} turned ${actualAction} successfully.`;
+                          // Add successfully if not present and not "already"
+                          if (!finalText.toLowerCase().includes("successfully") && !finalText.toLowerCase().includes("already")) {
+                            finalText = finalText.replace(/\.$/, "") + " successfully.";
+                          }
                           const suffix = totalPower >= 1000 ? " Watch out devices!" : "";
                           if (suffix && !finalText.includes("already") && !finalText.includes("Watch out")) {
                             finalText = finalText + suffix;
@@ -931,12 +994,11 @@ export default function SmartControl() {
                             ) : (
                               <p className="text-sm font-semibold text-[var(--volt-yellow)] opacity-90 tracking-wide animate-pulse">
                                 {(() => {
-                                  const actualAction = getAgentAction(agentSubmittedMessage || agentMessage)?.toLowerCase() || "off";
                                   const actionText = agentIntent === "SCHEDULE" 
                                     ? `Scheduling to turn ${actualAction}` 
-                                    : agentIntent === "OFF" 
+                                    : actualAction === "off" 
                                       ? "Turning off" 
-                                      : agentIntent === "ON"
+                                      : actualAction === "on"
                                         ? "Turning on"
                                         : "Updating";
                                   return `${actionText} ${agentTargetName || "device"}...`;
@@ -948,7 +1010,7 @@ export default function SmartControl() {
                             <button
                               type="button"
                               onClick={clearAgentResult}
-                              className="shrink-0 rounded-lg bg-[var(--volt-yellow)] px-5 py-2 text-xs font-bold text-black transition-all hover:brightness-110 hover:shadow-lg"
+                              className={`shrink-0 rounded-lg px-5 py-2 text-xs font-bold text-black transition-all hover:brightness-110 hover:shadow-lg ${agentResult.action === "SCHEDULE" ? "bg-amber-500" : "bg-[var(--volt-yellow)]"}`}
                             >
                               OK
                             </button>

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from db import initialize_database
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from routers import agent, analytics, billing, chat, dashboard, devices
+from routers import agent, analytics, billing, chat, dashboard, devices, multi_agent
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("voltstream")
@@ -48,8 +48,9 @@ def register_routes(api: FastAPI) -> None:
     api.include_router(analytics.router, prefix="/api/v1/analytics")
     api.include_router(devices.router, prefix="/api/v1/devices")
     api.include_router(billing.router, prefix="/api/v1/billing")
-    api.include_router(chat.router, prefix="/api/v1")
+    api.include_router(chat.router, prefix="/api/v1/aibot")
     api.include_router(agent.router, prefix="/api/v1/agent")
+    api.include_router(multi_agent.router, prefix="/api/v1/multi_agent")
 
 
 @app.get("/", include_in_schema=False)

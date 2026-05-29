@@ -3,10 +3,9 @@ import { fetchAnalyticsHistory } from "../api/analyticsApi";
 import { fetchBillingSummary } from "../api/billingApi";
 import { fetchLiveDashboard } from "../api/dashboardApi";
 import { fetchDevices } from "../api/devicesApi";
-import { generateUsageInsights } from "../api/insightsApi";
-import { BarChart3, CalendarClock, IndianRupee, Leaf, Sun } from "lucide-react";
+import { Network, BarChart3, Sun, Leaf, IndianRupee, CalendarClock, Zap } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import AiUsageSummaryModal, { AiUsageSummaryButton } from "../features/history/AiUsageSummary";
+import AgentWorkflowChat from "../features/history/AgentWorkflowChat";
 import PeriodToggle from "../features/history/PeriodToggle";
 import BarChartPanel from "../features/history/BarChartPanel";
 
@@ -22,16 +21,14 @@ function getBillOutlook(summary, periodGridUsage, periodSolarUsage) {
 
 export default function UsageHistory() {
   const [period, setPeriod] = useState("daily");
+
+
   const [data, setData] = useState([]);
   const [billing, setBilling] = useState(null);
   const [devices, setDevices] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [insights, setInsights] = useState(null);
-  const [insightsLoading, setInsightsLoading] = useState(true);
-  const [insightsError, setInsightsError] = useState(null);
-  const [insightsPeriod, setInsightsPeriod] = useState(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
@@ -58,53 +55,6 @@ export default function UsageHistory() {
     };
   }, []);
 
-  const insightInputReady = useMemo(
-    () => !loading && data.length > 0 && billing && dashboard && Array.isArray(devices),
-    [billing, dashboard, data, devices, loading]
-  );
-
-  useEffect(() => {
-    if (!summaryOpen) {
-      return undefined;
-    }
-
-    if (!insightInputReady) {
-      setInsights(null);
-      setInsightsLoading(true);
-      return undefined;
-    }
-
-    if (insights && insightsPeriod === period) {
-      setInsightsLoading(false);
-      setInsightsError(null);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setInsightsLoading(true);
-    setInsightsError(null);
-
-    generateUsageInsights({
-      period,
-      analytics: data,
-      billing,
-      devices,
-      dashboard,
-      signal: controller.signal,
-    })
-      .then((result) => {
-        setInsights(result);
-        setInsightsPeriod(period);
-      })
-      .catch((err) => {
-        if (err?.name === "CanceledError" || err?.name === "AbortError") return;
-        setInsightsError(err.message || "Unable to generate AI summary right now.");
-      })
-      .finally(() => setInsightsLoading(false));
-
-    return () => controller.abort();
-  }, [billing, dashboard, data, devices, insightInputReady, insights, insightsPeriod, period, summaryOpen]);
-
   const totalGrid = data.reduce((sum, item) => sum + Number(item.grid ?? 0), 0);
   const totalSolar = data.reduce((sum, item) => sum + Number(item.solar ?? 0), 0);
   const solarCoverage = totalGrid > 0 ? Math.round((totalSolar / totalGrid) * 100) : 0;
@@ -121,14 +71,42 @@ export default function UsageHistory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <PageHeader
-          title="Usage History"
-          subtitle="See how your home used grid and solar power over time."
-        />
-        <div data-tour="history-filters">
+      <PageHeader
+        title="Usage History"
+        subtitle="See how your home used grid and solar power over time."
+      />
+      
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div data-tour="history-filters" className="shrink-0">
           <PeriodToggle options={["daily", "weekly", "monthly"]} selected={period} onChange={setPeriod} />
         </div>
+        <button
+          data-tour="history-ai-summary"
+          type="button"
+          onClick={() => setSummaryOpen(true)}
+          className="group relative flex min-h-[50px] flex-1 items-center justify-between overflow-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-[#1c1603] px-5 py-2 text-sm font-semibold text-white outline-none transition-all hover:border-[var(--volt-yellow)] hover:bg-[#261f05] hover:shadow-[0_0_24px_rgba(234,179,8,0.15)] focus:border-[var(--volt-yellow)] focus:bg-[#261f05] focus:shadow-[0_0_24px_rgba(234,179,8,0.15)]"
+        >
+          {/* Floating Energy Icons Background */}
+          <div className="absolute inset-y-0 right-0 z-0 pointer-events-none flex items-center justify-end gap-8 pr-16 opacity-15">
+            <Zap className="animate-[bounce_2s_infinite] text-[var(--volt-yellow)]" size={32} />
+            <Sun className="animate-[spin_4s_linear_infinite] text-orange-400" size={36} />
+            <Leaf className="animate-[bounce_3s_infinite] text-emerald-400" size={32} />
+            <Zap className="animate-[pulse_1.5s_infinite] text-[var(--volt-yellow)] hidden sm:block" size={28} />
+            <Sun className="animate-[spin_3s_linear_infinite] text-orange-400 hidden md:block" size={28} />
+          </div>
+          
+          <div className="relative z-10 flex items-center gap-3 text-[var(--volt-yellow)] transition-colors">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--volt-yellow)] text-black shadow-[0_0_10px_rgba(234,179,8,0.4)]">
+              <Network size={18} />
+            </span>
+            <span className="truncate font-bold text-shadow-sm">
+              Smart Manager <span className="font-normal text-zinc-300">(e.g. Give me advice based on last week's usage)</span>
+            </span>
+          </div>
+          <div className="relative z-10 hidden h-8 shrink-0 items-center justify-center rounded-lg bg-[var(--volt-yellow)] px-3 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_10px_rgba(234,179,8,0.4)] sm:flex">
+            Ask
+          </div>
+        </button>
       </div>
 
       {!loading && !error && data.length > 0 ? (
@@ -195,7 +173,6 @@ export default function UsageHistory() {
           <BarChartPanel
             data={data}
             className="h-full"
-            headerAction={<AiUsageSummaryButton period={period} onClick={() => setSummaryOpen(true)} />}
           />
         ) : (
           <div className="flex h-full items-center justify-center rounded-3xl border border-zinc-800 bg-zinc-950 text-zinc-400">
@@ -204,14 +181,7 @@ export default function UsageHistory() {
         )}
       </div>
 
-      <AiUsageSummaryModal
-        period={period}
-        insights={insights}
-        loading={insightsLoading}
-        error={insightsError}
-        open={summaryOpen}
-        onClose={() => setSummaryOpen(false)}
-      />
+      <AgentWorkflowChat open={summaryOpen} onClose={() => setSummaryOpen(false)} />
     </div>
   );
 }

@@ -220,7 +220,7 @@ voltstream/
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts, Lucide Icons
 - **Backend**: FastAPI, Pydantic, Python 3.10+
 - **Database**: Embedded SQLite, ChromaDB (Vector Store)
-- **AI/ML**: Google Gemini 2.5 Flash, Gemini Embeddings, Google Agent Development Kit (ADK)
+- **AI/ML**: Google Gemini 2.5 Flash, Gemini Embeddings, official `google-genai` SDK framework (Vertex AI integration), Google Agent Development Kit (ADK)
 
 ---
 
