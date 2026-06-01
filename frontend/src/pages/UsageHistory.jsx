@@ -84,26 +84,26 @@ export default function UsageHistory() {
           data-tour="history-ai-summary"
           type="button"
           onClick={() => setSummaryOpen(true)}
-          className="group relative flex min-h-[50px] flex-1 items-center justify-between overflow-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-[#1c1603] px-5 py-2 text-sm font-semibold text-white outline-none transition-all hover:border-[var(--volt-yellow)] hover:bg-[#261f05] hover:shadow-[0_0_24px_rgba(234,179,8,0.15)] focus:border-[var(--volt-yellow)] focus:bg-[#261f05] focus:shadow-[0_0_24px_rgba(234,179,8,0.15)]"
+          className="group relative flex min-h-[56px] flex-1 items-center justify-between overflow-hidden rounded-xl border border-[var(--volt-yellow-border)] bg-[#1c1603] px-4 py-2 text-sm font-semibold text-white outline-none transition-all hover:border-[var(--volt-yellow)] hover:bg-[#261f05] hover:shadow-[0_0_18px_rgba(234,179,8,0.14)] focus:border-[var(--volt-yellow)] focus:bg-[#261f05] focus:shadow-[0_0_18px_rgba(234,179,8,0.14)]"
         >
           {/* Floating Energy Icons Background */}
-          <div className="absolute inset-y-0 right-0 z-0 pointer-events-none flex items-center justify-end gap-8 pr-16 opacity-15">
-            <Zap className="animate-[bounce_2s_infinite] text-[var(--volt-yellow)]" size={32} />
-            <Sun className="animate-[spin_4s_linear_infinite] text-orange-400" size={36} />
-            <Leaf className="animate-[bounce_3s_infinite] text-emerald-400" size={32} />
-            <Zap className="animate-[pulse_1.5s_infinite] text-[var(--volt-yellow)] hidden sm:block" size={28} />
-            <Sun className="animate-[spin_3s_linear_infinite] text-orange-400 hidden md:block" size={28} />
+          <div className="absolute inset-y-0 right-0 z-0 pointer-events-none flex items-center justify-end gap-7 pr-14 opacity-10">
+            <Zap className="animate-[bounce_2s_infinite] text-[var(--volt-yellow)]" size={26} />
+            <Sun className="animate-[spin_4s_linear_infinite] text-orange-400" size={28} />
+            <Leaf className="animate-[bounce_3s_infinite] text-emerald-400" size={26} />
+            <Zap className="animate-[pulse_1.5s_infinite] text-[var(--volt-yellow)] hidden sm:block" size={24} />
+            <Sun className="animate-[spin_3s_linear_infinite] text-orange-400 hidden md:block" size={24} />
           </div>
           
           <div className="relative z-10 flex items-center gap-3 text-[var(--volt-yellow)] transition-colors">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--volt-yellow)] text-black shadow-[0_0_10px_rgba(234,179,8,0.4)]">
-              <Network size={18} />
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--volt-yellow)] text-black shadow-[0_0_8px_rgba(234,179,8,0.35)]">
+              <Network size={19} />
             </span>
-            <span className="truncate font-bold text-shadow-sm">
-              Smart Manager <span className="font-normal text-zinc-300">(e.g. Give me advice based on last week's usage)</span>
+            <span className="font-display truncate text-base font-bold uppercase tracking-wider text-shadow-sm sm:text-lg">
+              Smart Advisor
             </span>
           </div>
-          <div className="relative z-10 hidden h-8 shrink-0 items-center justify-center rounded-lg bg-[var(--volt-yellow)] px-3 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_10px_rgba(234,179,8,0.4)] sm:flex">
+          <div className="relative z-10 hidden h-8 shrink-0 items-center justify-center rounded-lg bg-[var(--volt-yellow)] px-4 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_8px_rgba(234,179,8,0.35)] sm:flex">
             Ask
           </div>
         </button>

@@ -1,9 +1,8 @@
 import json  # Formats SSE data for frontend.
 import logging  # Debug and error logging.
 import os  # Environment variables (API keys, timezone).
-import re
 import threading  # Non-blocking background worker for schedules.
-from datetime import datetime, timedelta  # Time math for scheduling.
+from datetime import datetime  # Time math for scheduling.
 from uuid import uuid4  # Unique IDs for sessions and jobs.
 from zoneinfo import ZoneInfo  # Local timezone support.
 
@@ -15,6 +14,7 @@ from google.genai.types import Content, Part  # Formatting for Google AI API.
 from schemas.device import DeviceStatusUpdate  # Pydantic schema validation.
 from services import device_service  # DB layer for physical device updates.
 from utils.certificates import verify_token  # Certificate verification
+from utils.decorators import tool_annotation
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,14 @@ def _find(query: str) -> dict | None:
 
 
 # Tool: Acts as the AI's database lookup to fetch the exact device ID and its current ON/OFF status.
+@tool_annotation(
+    name="get_device_status",
+    agent="voltstream_device_agent",
+    purpose="Fetch exact device ID and its current ON/OFF status.",
+    when_to_use="When checking the current status of a device or validating its ID.",
+    parameters={"device_id": "Device id, name, or type — e.g. 'AC', 'Air Conditioning', 'fan'."},
+    returns="Dictionary containing status, exact device_id, name, and current_status.",
+)
 def get_device_status(device_id: str) -> dict:
     """Get the current status of a VoltStream device.
 
@@ -45,6 +53,17 @@ def get_device_status(device_id: str) -> dict:
 
 
 # Tool: Instantly updates the database to turn a device ON or OFF.
+@tool_annotation(
+    name="toggle_device",
+    agent="voltstream_device_agent",
+    purpose="Turn a VoltStream device ON or OFF immediately.",
+    when_to_use="When the user requests an immediate command like 'turn on' or 'turn off'.",
+    parameters={
+        "device_id": "Exact device id from get_device_status — e.g. 'ac-1'.",
+        "state": "'ON' or 'OFF'."
+    },
+    returns="Dictionary containing the result of the toggle operation.",
+)
 def toggle_device(device_id: str, state: str) -> dict:
     """Turn a VoltStream device ON or OFF immediately.
 
@@ -65,6 +84,14 @@ def toggle_device(device_id: str, state: str) -> dict:
     return {"status": "success", "device_id": updated["id"], "name": updated["name"], "updated_status": updated["status"], "message": f"{updated['name']} turned {updated['status']}."}
 
 # Tool: Turns all VoltStream devices ON or OFF
+@tool_annotation(
+    name="toggle_all_devices",
+    agent="voltstream_device_agent",
+    purpose="Turn ALL VoltStream devices ON or OFF.",
+    when_to_use="When the user wants to turn all devices on or off at once.",
+    parameters={"state": "'ON' or 'OFF'."},
+    returns="Dictionary containing the result and number of devices updated.",
+)
 def toggle_all_devices(state: str) -> dict:
     """Turn ALL VoltStream devices ON or OFF.
     
@@ -74,7 +101,7 @@ def toggle_all_devices(state: str) -> dict:
     if state not in {"ON", "OFF"}:
         return {"status": "error", "message": "State must be 'ON' or 'OFF'."}
     
-    devices = device_service.get_devices()
+    devices = device_service.list_devices()
     updated_count = 0
     for d in devices:
         if d["status"] != state:
@@ -132,6 +159,19 @@ def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: st
     }
 
 # Tool: Validates the dev certificate and then schedules the device toggle.
+@tool_annotation(
+    name="schedule_device",
+    agent="voltstream_device_agent",
+    purpose="Schedule a VoltStream device to turn ON or OFF at a future time using a valid certificate.",
+    when_to_use="For timed commands like 'in X minutes' or 'at HH:MM'.",
+    parameters={
+        "device_id": "Exact device id from get_device_status — e.g. 'ac-1'.",
+        "state": "'ON' or 'OFF'.",
+        "scheduled_time_iso": "Future datetime in ISO 8601 format e.g. 2025-05-21T22:00:00.",
+        "cert": "Base64-encoded client certificate or token that authorizes this specific action."
+    },
+    returns="Dictionary containing the scheduled job details.",
+)
 def schedule_device(device_id: str, state: str, scheduled_time_iso: str, cert: str) -> dict:
     """Schedule a VoltStream device to turn ON or OFF at a future time using a valid certificate.
 

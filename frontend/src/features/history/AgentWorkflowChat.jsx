@@ -43,7 +43,7 @@ function formatInline(text) {
 function formatAgentName(name) {
   if (name === "analyst_agent" || name === "call_analyst_agent") return "Usage Details";
   if (name === "advisor_agent" || name === "call_advisor_agent") return "Saving Tips";
-  if (name === "orchestrator_agent") return "Smart Manager";
+  if (name === "orchestrator_agent") return "Smart Advisor";
   if (name === "fetch_usage_history") return "History";
   if (name === "search_energy_knowledge_base") return "Knowledge Base";
   return name.replace(/_/g, " ");
@@ -54,7 +54,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
     {
       id: "init",
       role: "assistant",
-      text: "Hi! I am the Smart Manager. I analyze your past usage and give smart saving tips to help you lower your bill! Ask me a question like:\n\n- Show my last week electricity usage.\n- Give me energy-saving advice based on last week's usage.",
+      text: "Hi! I am the Smart Advisor. I analyze your past usage and give smart saving tips to help you lower your bill! Ask me a question like:\n\n- Show my last week electricity usage.\n- Give me energy-saving advice based on last week's usage.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -164,11 +164,11 @@ export default function AgentWorkflowChat({ open, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/50 p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)]">
-              <Network size={20} />
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--volt-yellow-soft)] text-[var(--volt-yellow)] ring-1 ring-[var(--volt-yellow-border)]">
+              <Network size={18} />
             </span>
             <div>
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Smart Manager</h2>
+              <h2 className="font-display text-lg font-bold uppercase tracking-wider text-[var(--volt-yellow)]">Smart Advisor</h2>
               <p className="text-xs text-zinc-400">Your personal usage agent</p>
             </div>
           </div>
@@ -195,7 +195,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
                   <div className="mb-2 flex items-center gap-2 border-b border-zinc-800/50 pb-2">
                     <Network size={16} className="text-[var(--volt-yellow)]" />
                     <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      Smart Manager
+                      Smart Advisor
                     </span>
                   </div>
                 )}
@@ -242,7 +242,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-[var(--volt-yellow)]">
                   <Bot size={16} className="animate-pulse" />
                 </div>
-                <span className="text-sm text-[var(--volt-yellow)] font-medium italic animate-pulse">Smart Manager is thinking...</span>
+                <span className="text-sm text-[var(--volt-yellow)] font-medium italic animate-pulse">Smart Advisor is thinking...</span>
               </div>
             </div>
           )}

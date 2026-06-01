@@ -28,7 +28,7 @@ const pageIntroSteps = {
     target: "page-heading",
     title: "Usage History Overview",
     subtitle: "Understand your energy patterns over time",
-    body: "This page shows historical grid and solar data so you can compare usage patterns over time. Switch between daily, weekly, and monthly views and use the Smart Manager for a plain-language breakdown of what changed.",
+    body: "This page shows historical grid and solar data so you can compare usage patterns over time. Switch between daily, weekly, and monthly views and use the Smart Advisor for a plain-language breakdown of what changed.",
   },
   "/devices": {
     target: "smart-control-heading",
@@ -86,9 +86,9 @@ const pageSteps = {
     },
     {
       target: "history-ai-summary",
-      title: "Smart Manager",
+      title: "Smart Advisor",
       subtitle: "Plain-language analysis on demand",
-      body: "Ask the Smart Manager when you want a quick explanation of what changed in this period, how savings look, and what to do next.",
+      body: "Ask the Smart Advisor when you want a quick explanation of what changed in this period, how savings look, and what to do next.",
     },
     {
       target: "history-summary",

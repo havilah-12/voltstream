@@ -11,7 +11,7 @@ VoltStream is a household smart energy monitoring platform that helps users unde
 ### 📊 Energy Monitoring
 - **Live Dashboard**: Real-time grid draw, solar generation, and net usage.
 - **Analytics**: Daily, weekly, and monthly energy consumption trends.
-- **Smart Manager**: A multi-agent AI system that analyzes historical usage and provides personalized, actionable energy-saving advice.
+- **Smart Advisor**: A multi-agent AI system that analyzes historical usage and provides personalized, actionable energy-saving advice.
 - **Solar Tracking**: Monitor solar coverage and savings.
 
 ### 🏠 Smart Device Control
@@ -102,8 +102,8 @@ User Input: "How do solar panels work?"
 [Response] ◄── Returns answer to user
 ```
 
-### 4. 🕵️ Smart Manager Flow (Multi-Agent System)
-The Smart Manager leverages an Orchestrator Agent that delegates tasks to specialized sub-agents to analyze data and provide tailored energy advice.
+### 4. 🕵️ Smart Advisor Flow (Multi-Agent System)
+The Smart Advisor leverages an Orchestrator Agent that delegates tasks to specialized sub-agents to analyze data and provide tailored energy advice.
 
 ```text
 User Request: "How can I reduce my energy bill based on last week's usage?"
@@ -120,6 +120,15 @@ User Request: "How can I reduce my energy bill based on last week's usage?"
    ▼
 [Response] ◄── streams comprehensive, personalized analysis back to UI
 ```
+
+**Analyst Agent Tool Routing:**
+The Analyst Agent has three separate annotated tools because each one answers a different class of energy question:
+
+- `fetch_usage_history` - home-level historical grid/solar trends, peaks, and day-based usage questions.
+- `fetch_device_power_usage` - current real-time power draw for active devices.
+- `fetch_device_historical_usage` - past kWh consumption for individual devices by day, week, or month.
+
+Keeping these tools separate gives the agent clearer routing instructions than one broad database tool with mixed responsibilities.
 
 ### 5. 🗄️ Database Flow (SQLite)
 Embedded zero-config database using native python `sqlite3`.
