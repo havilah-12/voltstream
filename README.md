@@ -218,24 +218,30 @@ Frontend will be available at: http://localhost:5173
 ---
 
 ## 📁 Project Structure
-```
+```text
 voltstream/
 ├── backend/                    # FastAPI backend
 │   ├── data/                   # Knowledge base & DB Seeds
+│   ├── prompts/                # LLM system prompts & templates
 │   ├── routers/                # API endpoints
-│   ├── services/               # Core business & AI logic
 │   ├── schemas/                # Pydantic models
-│   ├── db.py                   # SQLite connection
+│   ├── services/               # Core business & AI logic
+│   ├── utils/                  # Helper utilities (certs, decorators)
 │   ├── config.py               # Configuration
+│   ├── db.py                   # SQLite connection
 │   ├── main.py                 # FastAPI app
 │   └── requirements.txt        
 │
 ├── frontend/                   # React frontend
 │   ├── src/
 │   │   ├── api/                # API client functions
+│   │   ├── assets/             # Static images and icons
+│   │   ├── auth/               # Authentication context & routes
 │   │   ├── components/         # Reusable UI components
+│   │   ├── constants/          # UI constants and config
 │   │   ├── features/           # Feature modules
 │   │   ├── pages/              # Main app views
+│   │   ├── utils/              # Frontend helper functions
 │   │   └── App.jsx             # Main app component
 │   └── package.json            
 │
