@@ -13,7 +13,7 @@ async def run_orchestrator_agent(
         examples=[
             {"message": "Show my last week electricity usage."}, # Tests routing to the Analyst Agent
             {"message": "How can I reduce my energy bill?"}, # Tests routing to the Advisor Agent
-            {"message": "Give me energy-saving advice based on last week's usage."}, # Tests the complex route requiring both agents
+            {"message": "Give me energy-saving advice based on last week's usage."}, # Tests the  route requiring both agents
         ],
     )
 ):

@@ -1,27 +1,12 @@
 
 from db import get_connection
+from prompts import QA_PROMPT_TEMPLATE
 from schemas.chat import ChatRequest, ChatResponse
 from services.chroma_service import retrieve_chroma_chunks
 from services.gemini_service import ask_gemini
 
 OUT_OF_SCOPE_ANSWER = "I don't have that information."
 GUIDE_CHUNK_LIMIT = 3
-
-QA_PROMPT_TEMPLATE = """You are the VoltStream AI Assistant. Answer using ONLY the provided context below.
-
-Rules:
-- If the answer is not in the context, reply: {out_of_scope_answer}
-- For navigation questions, name the page from context
-- For billing estimates, use SQL invoice history if available
-- Combine document and SQL context naturally
-- Keep answers concise
-
-Question: {question}
-
-Context:
-{context}
-
-Answer:"""
 
 
 def _fetch_billing_context(connection) -> str | None:

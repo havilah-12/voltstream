@@ -8,6 +8,11 @@ from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
+from prompts import (
+    ADVISOR_AGENT_INSTRUCTION,
+    ANALYST_AGENT_INSTRUCTION,
+    ORCHESTRATOR_AGENT_INSTRUCTION,
+)
 
 from services.analytics_service import get_history
 from services.chroma_service import retrieve_chroma_chunks
@@ -24,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Tool for the Analyst Agent to fetch historical energy data from the database
 @tool_annotation(
+    # metadata/documentation of the tool for understanding by LLM 
     name="fetch_usage_history",
     agent="analyst_agent",
     purpose="Fetch usage history (grid and solar data) for a given period.",
@@ -127,19 +133,8 @@ analyst_agent = Agent(
     name="analyst_agent",
     model=model_name,
     description="Analyzes historical energy usage data (grid and solar).",
-    instruction=(
-        "You are the Data Analyst Agent. Your job is to fetch and analyze energy usage data.\n\n"
-        "TOOL USAGE RULES:\n"
-        "- Use `fetch_usage_history`: To analyze overall home energy trends, patterns, and peaks over a period (Note: pass 'daily' to get data for specific days like Mon, Tue, Friday, etc.).\n"
-        "- Use `fetch_device_power_usage`: For real-time or current power consumption of individual active devices.\n"
-        "- Use `fetch_device_historical_usage`: For past consumption of specific devices over a period or specific day (Note: pass 'daily' to get data for specific days like Mon, Tue, etc.).\n\n"
-        "OUTPUT RULES:\n"
-        "- Return a brief usage summary with only the most important numbers.\n"
-        "- Explain data using simple, conversational language for an average homeowner.\n"
-        "- ALWAYS use 'kWh' instead of 'units'.\n"
-        "- Avoid long paragraphs; keep the analysis to 2-3 short sentences unless the user asks for details.\n"
-        "- If analyzing a specific past day, clarify you mean 'last [Day]' (e.g., 'last Saturday')."
-    ),
+    instruction=ANALYST_AGENT_INSTRUCTION,
+    # actual toolbox the agent is allowed to use
     tools=[fetch_usage_history, fetch_device_power_usage, fetch_device_historical_usage],
 )
 
@@ -147,18 +142,7 @@ advisor_agent = Agent(
     name="advisor_agent",
     model=model_name,
     description="Provides actionable energy-saving advice using a knowledge base.",
-    instruction=(
-        "You are the Energy Advisor Agent. Your job is to provide concrete, actionable energy-saving tips.\n\n"
-        "TOOL USAGE RULES:\n"
-        "- ALWAYS use `search_energy_knowledge_base` to find relevant best practices.\n"
-        "- If the tool returns 'No relevant advice found', you MUST reply exactly with: 'I don't have that information.'\n\n"
-        "OUTPUT RULES:\n"
-        "- Base your recommendations directly on the provided context or user query.\n"
-        "- Keep advice friendly, simple, and non-technical.\n"
-        "- Give 3-5 tips maximum.\n"
-        "- Use short side headings for each tip, followed by one clear sentence.\n"
-        "- Do not write long paragraphs or repeat the same idea in multiple tips."
-    ),
+    instruction=ADVISOR_AGENT_INSTRUCTION,
     tools=[search_energy_knowledge_base],
 )
 
@@ -249,21 +233,7 @@ orchestrator_agent = Agent(
     name="orchestrator_agent",
     model=model_name,
     description="Coordinates between the Analyst and Advisor to answer user queries.",
-    instruction=(
-        "You are the Orchestrator Agent. Your role is to coordinate specialized agents to build a final answer.\n\n"
-        "ROUTING RULES:\n"
-        "1. Past/Current Usage Data -> Call `call_analyst_agent`\n"
-        "2. General Tips/Advice -> Call `call_advisor_agent`\n"
-        "3. Advice based on Usage -> Call `call_analyst_agent` FIRST, THEN pass its result as `usage_context` to `call_advisor_agent`.\n\n"
-        "OUTPUT RULES:\n"
-        "- Combine the agents' responses into one concise markdown answer.\n"
-        "- ALWAYS relay the exact numbers, analysis, and tips provided by the sub-agents.\n"
-        "- Translate any remaining technical jargon into simple terms for an average homeowner.\n"
-        "- For usage-plus-advice answers, use this shape: one short usage summary, then 3-5 advice bullets.\n"
-        "- Each advice bullet should have a short heading and only one sentence of explanation.\n"
-        "- Do not include long intros, long paragraphs, or more than 5 tips unless the user asks for details.\n"
-        "- NEVER respond with just 'Task completed successfully'."
-    ),
+    instruction=ORCHESTRATOR_AGENT_INSTRUCTION,
     tools=[call_analyst_agent, call_advisor_agent],
 )
 

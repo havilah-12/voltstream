@@ -11,6 +11,7 @@ from google.adk.agents import Agent  # Defines AI tools and instructions.
 from google.adk.runners import Runner  # Engine that processes prompts.
 from google.adk.sessions import InMemorySessionService  # Stores conversation memory in RAM.
 from google.genai.types import Content, Part  # Formatting for Google AI API.
+from prompts import DEVICE_AGENT_INSTRUCTION, DEVICE_AGENT_USER_CONTEXT_TEMPLATE
 from schemas.device import DeviceStatusUpdate  # Pydantic schema validation.
 from services import device_service  # DB layer for physical device updates.
 from utils.certificates import verify_token  # Certificate verification
@@ -198,23 +199,7 @@ _agent = Agent(
     name="voltstream_device_agent",
     model=settings.gemini_model.removeprefix("models/"),
     description="Controls VoltStream smart home devices.",
-    instruction=(
-        "Control VoltStream smart home devices using the provided tools.\n\n"
-        "The current device context (names, IDs, and statuses) is provided in the prompt.\n"
-        "Use this context to directly find the correct 'device_id'.\n"
-        "Step 1 — Decide which tool to use:\n"
-        "  • Immediate command ('turn on', 'turn off') → call toggle_device(device_id, state)\n"
-        "  • Timed command ('in X minutes', 'in X seconds', 'at HH:MM') → call schedule_device(device_id, state, scheduled_time_iso, cert)\n"
-        "    Convert the timing to ISO 8601 using Asia/Kolkata timezone based on the current time provided in the prompt.\n"
-        "    You MUST use the provided 'client_certificate' from the prompt as the 'cert' parameter.\n\n"
-        "Intent mapping:\n"
-        "  turn on / start / enable → ON\n"
-        "  turn off / stop / disable / shut down → OFF\n\n"
-        "Reply in one line. Use correct grammar based on the action.\n"
-        "Immediate example: 'AC 1 was turned ON.'\n"
-        "Scheduled example: 'AC 1 will be turned ON in 10 seconds.'\n"
-        "Already in state example: 'AC 1 is already OFF.'"
-    ),
+    instruction=DEVICE_AGENT_INSTRUCTION,
     tools=[get_device_status, toggle_device, schedule_device, toggle_all_devices],
 )
 
@@ -258,7 +243,12 @@ async def stream_device_agent(message: str):
         devices = list_devices()
         devices_list_str = ", ".join([f"{d['name']} (id: {d['id']}, status: {d['status']})" for d in devices])
         
-        prompt_with_time = f"Current Time (Asia/Kolkata): {now_iso}\nClient Certificate: {client_cert}\nDevices Context: {devices_list_str}\nUser Command: {user_text}"
+        prompt_with_time = DEVICE_AGENT_USER_CONTEXT_TEMPLATE.format(
+            now_iso=now_iso,
+            client_cert=client_cert,
+            devices_context=devices_list_str,
+            user_text=user_text,
+        )
         
         async for event in _runner.run_async(
             user_id="user",
