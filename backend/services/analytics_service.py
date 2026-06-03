@@ -1,6 +1,6 @@
 import logging
 
-from db import get_connection
+from database.db import get_connection
 
 logger = logging.getLogger("voltstream")
 

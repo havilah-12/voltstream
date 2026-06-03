@@ -1,4 +1,4 @@
-from db import get_connection
+from database.db import get_connection
 
 
 def get_billing_summary():

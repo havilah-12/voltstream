@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from data.mock_data import mock_db
+from database.mock_data import mock_db
 
 BACKEND_DIR = Path(__file__).resolve().parent
 DB_PATH = BACKEND_DIR / "voltstream.sqlite3"

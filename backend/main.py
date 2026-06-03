@@ -1,7 +1,10 @@
+import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+
 import logging
 from contextlib import asynccontextmanager
 
-from db import initialize_database
+from database.db import initialize_database
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers import agent, analytics, billing, chat, dashboard, devices, multi_agent

@@ -155,7 +155,7 @@ Embedded zero-config database using native python `sqlite3`.
 - `billing_summary` - Current billing info
 - `invoice_history` - Past invoices
 
-*(DB auto-initializes on startup with seed data from `backend/data/seed_db.py`)*
+*(DB auto-initializes on startup with seed data from `backend/database/seed_db.py`)*
 
 ### 6. 🧩 ChromaDB Flow (Vector Initialization)
 Handles the startup sequence for creating the vector database used in RAG.
@@ -173,7 +173,7 @@ Handles the startup sequence for creating the vector database used in RAG.
 [Gemini Embeddings] ──► converts text chunks into vector embeddings via API
    │
    ▼
-[ChromaDB] ◄── stores vectors locally in 'chroma_data/' folder for fast querying
+[ChromaDB] ◄── stores vectors locally in '.chroma_data/' folder for fast querying
 ```
 
 ---
@@ -221,14 +221,15 @@ Frontend will be available at: http://localhost:5173
 ```text
 voltstream/
 ├── backend/                    # FastAPI backend
-│   ├── data/                   # Knowledge base & DB Seeds
+│   ├── data/                   # Knowledge base PDF and TXT files
+│   ├── database/               # SQLite connection, mock data, and DB Seeds
 │   ├── prompts/                # LLM system prompts & templates
 │   ├── routers/                # API endpoints
 │   ├── schemas/                # Pydantic models
 │   ├── services/               # Core business & AI logic
+│   ├── testing/                # Evaluation & latency test scripts
 │   ├── utils/                  # Helper utilities (certs, decorators)
 │   ├── config.py               # Configuration
-│   ├── db.py                   # SQLite connection
 │   ├── main.py                 # FastAPI app
 │   └── requirements.txt        
 │

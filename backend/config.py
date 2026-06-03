@@ -36,5 +36,5 @@ def get_settings() -> Settings:
         gemini_model=os.getenv("GEMINI_MODEL", "") or "models/gemini-2.0-flash",
         gemini_embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "") or "models/gemini-embedding-001",
         chroma_collection_name=os.getenv("CHROMA_COLLECTION_NAME", "") or "voltstream_guide",
-        chroma_path=os.getenv("CHROMA_PATH", "") or "chroma_data",
+        chroma_path=os.getenv("CHROMA_PATH", "") or ".chroma_data",
     )

@@ -91,7 +91,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
     if (agentCacheRef.current[trimmed]) {
       setMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), role: "assistant", text: agentCacheRef.current[trimmed] },
+        { id: Date.now().toString(), role: "assistant", text: agentCacheRef.current[trimmed].text, evalScore: agentCacheRef.current[trimmed].evalScore },
       ]);
       return;
     }
@@ -103,6 +103,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
     abortControllerRef.current = controller;
 
     let finalAnswer = "";
+    let currentEval = null;
 
     try {
       await runOrchestratorAgent(trimmed, {
@@ -128,15 +129,17 @@ export default function AgentWorkflowChat({ open, onClose }) {
             });
           } else if (parsed.event === "answer") {
             finalAnswer = parsed.data.answer;
+          } else if (parsed.event === "eval_score") {
+            currentEval = parsed.data;
           }
         },
       });
 
       if (finalAnswer) {
-        agentCacheRef.current[trimmed] = finalAnswer;
+        agentCacheRef.current[trimmed] = { text: finalAnswer, evalScore: currentEval };
         setMessages((prev) => [
           ...prev,
-          { id: Date.now().toString(), role: "assistant", text: finalAnswer },
+          { id: Date.now().toString(), role: "assistant", text: finalAnswer, evalScore: currentEval },
         ]);
       } else {
         setMessages((prev) => [
@@ -202,6 +205,27 @@ export default function AgentWorkflowChat({ open, onClose }) {
                 <div className="text-sm leading-relaxed">
                   {msg.role === "assistant" ? <MessageBody text={msg.text} /> : msg.text}
                 </div>
+                {msg.evalScore && (
+                  <details className="mt-4 border border-zinc-800 rounded-lg p-3 bg-black/20 text-xs text-zinc-400 group cursor-pointer transition-colors hover:border-zinc-700">
+                    <summary className="font-semibold uppercase tracking-wider text-[var(--volt-yellow)] hover:text-white outline-none">
+                      🔍 Response Quality Check
+                    </summary>
+                    <div className="mt-3 space-y-2 border-t border-zinc-800/50 pt-2 cursor-default">
+                      <div className="flex justify-between items-center">
+                        <span>Faithfulness (Context Match):</span>
+                        <span className={`px-2 py-1 rounded font-bold ${msg.evalScore.faithfulness === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                          {msg.evalScore.faithfulness}/1
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Relevance (Question Answered):</span>
+                        <span className={`px-2 py-1 rounded font-bold ${msg.evalScore.relevance === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                          {msg.evalScore.relevance}/1
+                        </span>
+                      </div>
+                    </div>
+                  </details>
+                )}
               </div>
             </div>
           ))}

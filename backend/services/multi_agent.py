@@ -60,7 +60,7 @@ def fetch_usage_history(period: str) -> str:
 )
 def fetch_device_power_usage() -> str:
     """Fetch the real-time power usage (in Watts) of all devices currently active in the home."""
-    from db import get_connection
+    from database.db import get_connection
     with get_connection() as conn:
         rows = conn.execute("SELECT name, location, status, power_usage_w FROM devices ORDER BY power_usage_w DESC").fetchall()
     return json.dumps([dict(r) for r in rows])
@@ -84,7 +84,7 @@ def fetch_device_historical_usage(period: str) -> str:
     if period not in {"daily", "weekly", "monthly"}:
         period = "weekly"
     
-    from db import get_connection
+    from database.db import get_connection
     with get_connection() as conn:
         rows = conn.execute(
             """
@@ -205,6 +205,11 @@ async def call_advisor_agent(query: str, usage_context: str = "") -> str:
         usage_context: Optional context from the Analyst Agent to help tailor the advice.
     """
     import asyncio
+    import json
+    from google import genai
+    from prompts import JUDGE_PROMPT
+    from services.chroma_service import retrieve_chroma_chunks
+    
     full_query = f"Context: {usage_context}\n\nQuery: {query}" if usage_context else query
     for attempt in range(3):
         try:
@@ -223,6 +228,35 @@ async def call_advisor_agent(query: str, usage_context: str = "") -> str:
                 if event.is_final_response():
                     parts = event.content and event.content.parts
                     result = "".join(p.text for p in parts if getattr(p, "text", None)).strip() if parts else ""
+            
+            # --- WEEK 6: LLM-AS-A-JUDGE UI INTEGRATION ---
+            if result:
+                try:
+                    client = genai.Client()
+                    chunks = retrieve_chroma_chunks(query, limit=3)
+                    context = "\n".join(chunks) if chunks else "No context retrieved."
+                    
+                    judge_prompt_text = JUDGE_PROMPT.format(
+                        question=query,
+                        context=context,
+                        answer=result
+                    )
+                    
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=judge_prompt_text
+                    )
+                    
+                    result_text = response.text.replace("```json", "").replace("```", "").strip()
+                    score = json.loads(result_text)
+                    f_score = score.get("faithfulness", 0)
+                    r_score = score.get("relevance", 0)
+                    
+                    result += f" ___EVAL:{f_score},{r_score}___"
+                except Exception as eval_err:
+                    logger.warning("Judge evaluation failed: %s", eval_err)
+            # ---------------------------------------------
+            
             return result
         except Exception as e:
             if "429" in str(e) and attempt < 2:
@@ -271,6 +305,11 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
                 yield _sse("tool_call", {"name": call.name, "args": call.args})
             for resp in event.get_function_responses():
                 yield _sse("tool_response", {"name": resp.name})
+                if resp.name == "call_advisor_agent":
+                    import re
+                    match = re.search(r'___EVAL:(\d+),(\d+)___', str(resp.response))
+                    if match:
+                        yield _sse("eval_score", {"faithfulness": int(match.group(1)), "relevance": int(match.group(2))})
 
             if event.is_final_response():
                 parts = event.content and event.content.parts

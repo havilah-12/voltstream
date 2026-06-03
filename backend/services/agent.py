@@ -5,6 +5,7 @@ import threading  # Non-blocking background worker for schedules.
 from datetime import datetime  # Time math for scheduling.
 from uuid import uuid4  # Unique IDs for sessions and jobs.
 from zoneinfo import ZoneInfo  # Local timezone support.
+import time  # For calculating execution latency.
 
 from config import get_settings  # Loads app configuration.
 from google.adk.agents import Agent  # Defines AI tools and instructions.
@@ -214,6 +215,7 @@ def _sse(event_type: str, data: dict) -> str:
 
 # Streamer: The main engine that bridges Python and Gemini, executing tools and sending real-time updates back to the router.
 async def stream_device_agent(message: str):
+    start_time = time.time()
     session_id = f"session-{uuid4().hex}"
     await _sessions.create_session(app_name="voltstream", user_id="user", session_id=session_id)
     yield _sse("status", {"message": "Agent started."})
@@ -269,4 +271,5 @@ async def stream_device_agent(message: str):
         yield _sse("error", {"message": "Something went wrong. Please try again."})
         return
 
-    yield _sse("done", {"message": "Agent finished."})
+    latency_ms = round((time.time() - start_time) * 1000)
+    yield _sse("done", {"message": "Agent finished.", "latency_ms": latency_ms})

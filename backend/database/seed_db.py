@@ -1,4 +1,4 @@
-from db import DB_PATH, initialize_database
+from database.db import DB_PATH, initialize_database
 
 
 def main() -> None:

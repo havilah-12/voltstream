@@ -1,5 +1,5 @@
 
-from db import get_connection
+from database.db import get_connection
 from prompts import QA_PROMPT_TEMPLATE
 from schemas.chat import ChatRequest, ChatResponse
 from services.chroma_service import retrieve_chroma_chunks
@@ -105,15 +105,30 @@ def _fetch_device_context(connection) -> str | None:
     return "; ".join(devices) + "."
 
 
-def _get_sql_context() -> list[str]:
-    """Fetch all SQL contexts. LLM will use only relevant ones."""
+def _get_sql_context(query: str = "") -> list[str]:
+    """Fetch relevant SQL contexts based on keywords to save LLM tokens and lower latency."""
+    q = query.lower()
+    
+    needs_billing = any(w in q for w in ["bill", "budget", "save", "money", "cost", "pay"])
+    needs_history = any(w in q for w in ["history", "past", "previous", "invoice", "last month", "average"])
+    needs_live = any(w in q for w in ["live", "now", "current", "dashboard", "generating", "drawing", "net", "today"])
+    needs_devices = any(w in q for w in ["device", "appliance", "ac", "fan", "power", "watt", "status"])
+    
+    # If no keywords matched, fallback to bringing everything just in case.
+    if not any([needs_billing, needs_history, needs_live, needs_devices]):
+        needs_billing = needs_history = needs_live = needs_devices = True
+        
+    context = []
     with get_connection() as connection:
-        context = [
-            _fetch_billing_context(connection),
-            _fetch_invoice_history_context(connection),
-            _fetch_live_context(connection),
-            _fetch_device_context(connection),
-        ]
+        if needs_billing:
+            context.append(_fetch_billing_context(connection))
+        if needs_history:
+            context.append(_fetch_invoice_history_context(connection))
+        if needs_live:
+            context.append(_fetch_live_context(connection))
+        if needs_devices:
+            context.append(_fetch_device_context(connection))
+            
     return [item for item in context if item]
 
 
@@ -122,7 +137,7 @@ def answer_qa(request: ChatRequest) -> ChatResponse:
     # Run Chroma retrieval and SQL context fetching in parallel to save time
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_chroma = executor.submit(retrieve_chroma_chunks, request.question, GUIDE_CHUNK_LIMIT)
-        future_sql = executor.submit(_get_sql_context)
+        future_sql = executor.submit(_get_sql_context, request.question)
         guide_chunks = future_chroma.result()
         sql_chunks = future_sql.result()
     

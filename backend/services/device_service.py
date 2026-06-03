@@ -1,5 +1,5 @@
 
-from db import get_connection
+from database.db import get_connection
 from schemas.device import DevicePayload, DeviceStatusUpdate
 
 
