@@ -103,7 +103,7 @@ User Input: "How do solar panels work?"
 ```
 
 ### 4. 🕵️ Smart Advisor Flow (Multi-Agent System)
-The Smart Advisor leverages an Orchestrator Agent that delegates tasks to specialized sub-agents to analyze data and provide tailored energy advice.
+The Smart Advisor leverages an Orchestrator Agent that delegates tasks to specialized sub-agents to analyze data and provide tailored energy advice. We also implemented an **LLM-as-a-Judge** pipeline to evaluate the Agent's response for faithfulness before showing it to the user.
 
 ```text
 User Request: "How can I reduce my energy bill based on last week's usage?"
@@ -115,20 +115,25 @@ User Request: "How can I reduce my energy bill based on last week's usage?"
    └──► 2. [Advisor Agent] ─► queries ChromaDB vector store for best practices
    │
    ▼
-[Orchestrator Agent] ──► synthesizes data and knowledge
+[Orchestrator Agent] ──► synthesizes data and drafts a response
    │
    ▼
-[Response] ◄── streams comprehensive, personalized analysis back to UI
+[Judge Agent] ──► Evaluates drafted response against strict Faithfulness metrics
+   │
+   ▼
+[Backend Parser] ──► Strips secret JSON evaluation score from response text
+   │
+   ├──► [Frontend SSE - Event: eval_score] ─► Renders 1/1 Faithfulness UI dropdown
+   └──► [Frontend SSE - Event: message] ────► Streams text response back to UI
 ```
 
-**Analyst Agent Tool Routing:**
-The Analyst Agent has three separate annotated tools because each one answers a different class of energy question:
+**Agent Tool Routing:**
+The system uses multiple separate annotated tools to give the agents clear routing instructions rather than mixing responsibilities:
 
-- `fetch_usage_history` - home-level historical grid/solar trends, peaks, and day-based usage questions.
-- `fetch_device_power_usage` - current real-time power draw for active devices.
-- `fetch_device_historical_usage` - past kWh consumption for individual devices by day, week, or month.
-
-Keeping these tools separate gives the agent clearer routing instructions than one broad database tool with mixed responsibilities.
+- `fetch_usage_history`: Home-level historical grid/solar trends.
+- `fetch_device_power_usage`: Current real-time power draw for active devices.
+- `fetch_device_historical_usage`: Past kWh consumption for individual devices.
+- **LLM-as-a-Judge**: Evaluates responses internally against rule-sets to prevent hallucinating ungrounded advice.
 
 ### 5. 🗄️ Database Flow (SQLite)
 Embedded zero-config database using native python `sqlite3`.
