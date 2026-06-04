@@ -1,9 +1,11 @@
+import asyncio
 import json
 import logging
 import os
 from uuid import uuid4
 
 from config import get_settings
+from google import genai
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -11,6 +13,7 @@ from google.genai.types import Content, Part
 from prompts import (
     ADVISOR_AGENT_INSTRUCTION,
     ANALYST_AGENT_INSTRUCTION,
+    JUDGE_PROMPT,
     ORCHESTRATOR_AGENT_INSTRUCTION,
 )
 
@@ -161,7 +164,6 @@ async def call_analyst_agent(query: str) -> str:
     Args:
         query: What to ask the analyst agent (e.g. 'What was the peak grid usage last week?').
     """
-    import asyncio
     for attempt in range(3):
         try:
             if attempt > 0:
@@ -204,12 +206,6 @@ async def call_advisor_agent(query: str, usage_context: str = "") -> str:
         query: What to ask the advisor agent.
         usage_context: Optional context from the Analyst Agent to help tailor the advice.
     """
-    import asyncio
-    import json
-    from google import genai
-    from prompts import JUDGE_PROMPT
-    from services.chroma_service import retrieve_chroma_chunks
-    
     full_query = f"Context: {usage_context}\n\nQuery: {query}" if usage_context else query
     for attempt in range(3):
         try:
@@ -229,7 +225,7 @@ async def call_advisor_agent(query: str, usage_context: str = "") -> str:
                     parts = event.content and event.content.parts
                     result = "".join(p.text for p in parts if getattr(p, "text", None)).strip() if parts else ""
             
-            # --- WEEK 6: LLM-AS-A-JUDGE UI INTEGRATION ---
+            # --- LLM-AS-A-JUDGE UI INTEGRATION ---
             if result:
                 try:
                     client = genai.Client()

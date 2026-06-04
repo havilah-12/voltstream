@@ -3,6 +3,12 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
+import chromadb
+import pypdf
+from chromadb.api.types import Documents, Embeddings
+from chromadb.config import Settings
+from google import genai
+
 from config import get_settings
 
 logger = logging.getLogger("voltstream")
@@ -14,7 +20,6 @@ def _chunk_text(text: str) -> list[str]:
     return [chunk.strip() for chunk in text.split("\n") if len(chunk.strip()) > 50]
 
 def _load_documents() -> list[dict]:
-    import pypdf
     docs = []
     for pdf_file in DATA_DIR.glob("*.pdf"):
         try:
@@ -35,12 +40,8 @@ def _load_documents() -> list[dict]:
             
     return docs
 
-import chromadb
-from chromadb.api.types import Documents, Embeddings
-
 class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
     def __init__(self, model_name: str):
-        from google import genai
         self._client = genai.Client()
         self._model_name = model_name.removeprefix("models/")
 
@@ -61,9 +62,8 @@ def _get_collection():
     settings = get_settings()
 
     try:
-        import chromadb
+        pass
     except ImportError:
-        logger.warning("ChromaDB is not installed. RAG retrieval is unavailable.")
         return None
 
     persist_path = Path(settings.chroma_path)
@@ -74,7 +74,6 @@ def _get_collection():
     embedding_function = GeminiEmbeddingFunction(
         model_name=settings.gemini_embedding_model,
     )
-    from chromadb.config import Settings
     client = chromadb.PersistentClient(
         path=str(persist_path),
         settings=Settings(anonymized_telemetry=False)
