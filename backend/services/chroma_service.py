@@ -12,7 +12,7 @@ from google import genai
 from config import get_settings
 
 logger = logging.getLogger("voltstream")
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "knowledge_base"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 APP_ROOT = Path(__file__).resolve().parent.parent
 
 def _chunk_text(text: str) -> list[str]:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body
 from fastapi.responses import StreamingResponse
 from schemas.agent import AgentRequest
-from services.multi_agent import stream_orchestrator_agent
+from agents.orchestrator_agent import stream_orchestrator_agent
 
 router = APIRouter()
 

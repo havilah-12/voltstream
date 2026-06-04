@@ -30,7 +30,8 @@ documents = [
 ]
 
 def generate():
-    data_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+    os.makedirs(data_dir, exist_ok=True)
     for doc in documents:
         pdf = FPDF()
         pdf.add_page()

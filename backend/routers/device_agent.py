@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body
 from fastapi.responses import StreamingResponse
 from schemas.agent import AgentRequest
-from services.agent import stream_device_agent
+from agents.device_agent import stream_device_agent
 
 router = APIRouter()
 

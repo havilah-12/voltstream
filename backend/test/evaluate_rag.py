@@ -2,7 +2,7 @@ import asyncio
 import os
 import json
 from google import genai
-from services.multi_agent import call_advisor_agent
+from agents.advisor_agent import call_advisor_agent
 from services.chroma_service import retrieve_chroma_chunks
 from config import get_settings
 
