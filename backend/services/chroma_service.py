@@ -15,9 +15,14 @@ logger = logging.getLogger("voltstream")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 APP_ROOT = Path(__file__).resolve().parent.parent
 
-def _chunk_text(text: str) -> list[str]:
-    # Basic chunking: split by double newlines or single newlines if they are long enough
-    return [chunk.strip() for chunk in text.split("\n") if len(chunk.strip()) > 50]
+def _chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end].strip())
+        start += chunk_size - overlap
+    return [c for c in chunks if len(c) > 50]
 
 def _load_documents() -> list[dict]:
     docs = []
@@ -79,12 +84,16 @@ def _get_collection():
         settings=Settings(anonymized_telemetry=False)
     )
     
-    # Recreate the collection to ensure fresh PDF data is indexed
+    # Try to load existing collection to avoid re-embedding
     try:
-        client.delete_collection(name=settings.chroma_collection_name)
+        collection = client.get_collection(name=settings.chroma_collection_name)
+        if collection.count() > 0:
+            logger.info("Loaded existing Chroma collection with %s chunks.", collection.count())
+            return collection
     except Exception:
         pass
 
+    logger.info("Creating new Chroma collection and indexing documents...")
     collection = client.create_collection(
         name=settings.chroma_collection_name,
         metadata={"source": "voltstream_energy_guide"},
@@ -124,10 +133,10 @@ def _get_collection():
     return collection
 
 
-def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
+def retrieve_chroma_chunks_with_sources(question: str, limit: int = 3) -> tuple[list[str], list[str]]:
     collection = _get_collection()
     if collection is None:
-        return []
+        return [], []
 
     try:
         settings = get_settings()
@@ -138,9 +147,18 @@ def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
         result = collection.query(query_embeddings=query_embeddings, n_results=limit)
     except Exception as exc:
         logger.warning("Chroma query failed: %s", exc)
-        return []
+        return [], []
 
     documents = result.get("documents", [])
-    if not documents:
-        return []
-    return [chunk for chunk in documents[0] if chunk]
+    metadatas = result.get("metadatas", [])
+    
+    docs = [chunk for chunk in documents[0] if chunk] if documents else []
+    sources = []
+    if metadatas and metadatas[0]:
+        sources = list({m.get("source", "Unknown") for m in metadatas[0]})
+        
+    return docs, sources
+
+def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
+    docs, _ = retrieve_chroma_chunks_with_sources(question, limit)
+    return docs

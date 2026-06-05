@@ -34,6 +34,16 @@ function formatInline(text) {
   let html = text.replace(/^###\s+(.*)/gm, '<div class="text-base font-semibold text-[var(--volt-yellow)] mb-1 mt-2">$1</div>');
   html = html.replace(/^##\s+(.*)/gm, '<div class="text-base font-semibold text-[var(--volt-yellow)] mb-1 mt-3">$1</div>');
   html = html.replace(/^#\s+(.*)/gm, '<div class="text-base font-semibold text-[var(--volt-yellow)] mb-2 mt-4">$1</div>');
+  
+  // Auto-highlight bullet side headings (e.g. "Monitor and Control Usage:")
+  html = html.replace(/^([A-Za-z0-9\s\-&]+):/g, '<strong class="font-bold text-[var(--volt-yellow)]">$1:</strong>');
+  
+  // Auto-highlight numerical energy/time values
+  html = html.replace(/(\d+(?:\.\d+)?\s*(?:kWh|W|kW|hours|minutes|seconds|days|weeks|months|years|%))/gi, '<strong class="font-bold text-[var(--volt-yellow)]">$1</strong>');
+  
+  // Auto-highlight currency
+  html = html.replace(/(₹\s*\d+(?:\.\d+)?)/g, '<strong class="font-bold text-[var(--volt-yellow)]">$1</strong>');
+
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-[var(--volt-yellow)]">$1</strong>');
   html = html.replace(/\*(.*?)\*/g, '<em class="italic text-zinc-300">$1</em>');
   html = html.replace(/`(.*?)`/g, '<code class="rounded bg-black/40 px-1 py-0.5 text-sm text-[var(--volt-yellow)]">$1</code>');
@@ -104,6 +114,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
 
     let finalAnswer = "";
     let currentEval = null;
+    const assistantMsgId = Date.now().toString() + "-ast";
 
     try {
       await runOrchestratorAgent(trimmed, {
@@ -125,10 +136,40 @@ export default function AgentWorkflowChat({ open, onClose }) {
                   break;
                 }
               }
+              // If all tools are done, transition to generating response
+              if (updated.length > 0 && updated.every(t => t.status === "done" && t.name !== "Response")) {
+                 updated.push({ id: "gen-resp", name: "Response", status: "running" });
+              }
               return updated;
+            });
+          } else if (parsed.event === "answer_chunk") {
+            finalAnswer += parsed.data.chunk;
+            setMessages((prev) => {
+              const msgExists = prev.some(m => m.id === assistantMsgId);
+              if (msgExists) {
+                return prev.map(m => m.id === assistantMsgId ? { ...m, text: finalAnswer } : m);
+              } else {
+                return [...prev, { id: assistantMsgId, role: "assistant", text: finalAnswer }];
+              }
+            });
+            setActiveTools((prev) => {
+              if (prev.length > 0 && !prev.some(t => t.name === "Response")) {
+                return [...prev, { id: "gen-resp", name: "Response", status: "running" }];
+              }
+              return prev;
             });
           } else if (parsed.event === "answer") {
             finalAnswer = parsed.data.answer;
+            setActiveTools((prev) => {
+              const updated = [...prev];
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (updated[i].name === "Response") {
+                  updated[i].status = "done";
+                  break;
+                }
+              }
+              return updated;
+            });
           } else if (parsed.event === "eval_score") {
             currentEval = parsed.data;
           }
@@ -137,10 +178,14 @@ export default function AgentWorkflowChat({ open, onClose }) {
 
       if (finalAnswer) {
         agentCacheRef.current[trimmed] = { text: finalAnswer, evalScore: currentEval };
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), role: "assistant", text: finalAnswer, evalScore: currentEval },
-        ]);
+        setMessages((prev) => {
+          const msgExists = prev.some(m => m.id === assistantMsgId);
+          if (msgExists) {
+            return prev.map(m => m.id === assistantMsgId ? { ...m, text: finalAnswer, evalScore: currentEval } : m);
+          } else {
+            return [...prev, { id: assistantMsgId, role: "assistant", text: finalAnswer, evalScore: currentEval }];
+          }
+        });
       } else {
         setMessages((prev) => [
           ...prev,
@@ -156,7 +201,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
       }
     } finally {
       setLoading(false);
-      setActiveTools([]);
+      setTimeout(() => setActiveTools([]), 2000);
     }
   };
 
@@ -210,7 +255,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
                     <summary className="font-semibold uppercase tracking-wider text-[var(--volt-yellow)] hover:text-white outline-none">
                       🔍 Response Quality Check
                     </summary>
-                    <div className="mt-3 space-y-2 border-t border-zinc-800/50 pt-2 cursor-default">
+                    <div className="mt-3 space-y-2 border-t border-zinc-800/50 pt-2 cursor-default text-zinc-300">
                       <div className="flex justify-between items-center">
                         <span>Faithfulness (Context Match):</span>
                         <span className={`px-2 py-1 rounded font-bold ${msg.evalScore.faithfulness === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
@@ -223,6 +268,19 @@ export default function AgentWorkflowChat({ open, onClose }) {
                           {msg.evalScore.relevance}/1
                         </span>
                       </div>
+                      {msg.evalScore.sources && msg.evalScore.sources.length > 0 && (
+                        <div className="pt-2 mt-2 border-t border-zinc-800/50">
+                          <span className="text-zinc-500 mb-1 block">Sources:</span>
+                          <div className="flex flex-wrap gap-2">
+                            {msg.evalScore.sources.map((source, idx) => (
+                              <span key={idx} className="bg-zinc-800/50 px-2 py-1 rounded text-zinc-300 border border-zinc-700/50 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--volt-yellow)]"></span>
+                                {source}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </details>
                 )}
@@ -235,9 +293,13 @@ export default function AgentWorkflowChat({ open, onClose }) {
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-2xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-5 py-4 rounded-tl-sm">
                 <div className="mb-3 flex items-center gap-2">
-                  <Cpu size={16} className="animate-pulse text-[var(--volt-yellow)]" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--volt-yellow)]">
-                    Working on it
+                  {activeTools.every((t) => t.status === "done") ? (
+                    <CheckCircle2 size={16} className="text-emerald-400" />
+                  ) : (
+                    <Cpu size={16} className="animate-pulse text-[var(--volt-yellow)]" />
+                  )}
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${activeTools.every((t) => t.status === "done") ? "text-emerald-400" : "text-[var(--volt-yellow)]"}`}>
+                    {activeTools.every((t) => t.status === "done") ? "Tasks Completed" : "Working on it"}
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -249,7 +311,9 @@ export default function AgentWorkflowChat({ open, onClose }) {
                         <CheckCircle2 size={16} className="text-emerald-400" />
                       )}
                       <span className="text-sm text-zinc-300">
-                        {tool.status === "running" ? "Getting" : "Got"}{" "}
+                        {tool.name === "Response" 
+                          ? (tool.status === "running" ? "Generating " : "Generated ") 
+                          : (tool.status === "running" ? "Getting " : "Got ")}
                         <strong className="font-medium text-white">{tool.name}</strong>...
                       </span>
                     </div>

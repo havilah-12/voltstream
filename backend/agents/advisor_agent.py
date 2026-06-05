@@ -12,7 +12,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from prompts import ADVISOR_AGENT_INSTRUCTION, JUDGE_PROMPT
 
-from services.chroma_service import retrieve_chroma_chunks
+from services.chroma_service import retrieve_chroma_chunks, retrieve_chroma_chunks_with_sources
 from utils.decorators import tool_annotation
 
 logger = logging.getLogger(__name__)
@@ -52,60 +52,67 @@ _sessions = InMemorySessionService()
     name="call_advisor_agent",
     agent="orchestrator_agent",
     purpose="Consult the Advisor Agent for actionable energy-saving tips based on the knowledge base.",
-    when_to_use="When the user asks for general tips or advice to lower bills, optionally with context.",
+    when_to_use="When the user asks for general tips or advice to lower bills. This agent will automatically fetch usage data in parallel, so do not pass usage context.",
     parameters={
-        "query": "What to ask the advisor agent.",
-        "usage_context": "Optional context from the Analyst Agent to help tailor the advice."
+        "query": "What to ask the advisor agent."
     },
     returns="String containing the advice or a fallback message.",
 )
-async def call_advisor_agent(query: str, usage_context: str = "") -> str:
+async def call_advisor_agent(query: str) -> str:
     """Consult the Advisor Agent for actionable energy-saving tips based on the knowledge base."""
-    full_query = f"Context: {usage_context}\n\nQuery: {query}" if usage_context else query
     for attempt in range(3):
         try:
             if attempt > 0:
                 await asyncio.sleep(15)
                 
-            session_id = uuid4().hex
-            await _sessions.create_session(app_name="voltstream", user_id="user", session_id=session_id)
-            runner = Runner(agent=advisor_agent, app_name="voltstream", session_service=_sessions)
-            result = ""
-            async for event in runner.run_async(
-                user_id="user", 
-                session_id=session_id, 
-                new_message=Content(role="user", parts=[Part(text=full_query)])
-            ):
-                if event.is_final_response():
-                    parts = event.content and event.content.parts
-                    result = "".join(p.text for p in parts if getattr(p, "text", None)).strip() if parts else ""
+            client = genai.Client()
+            
+            # Retrieve context from ChromaDB and database in parallel
+            def _fetch_chroma():
+                return retrieve_chroma_chunks_with_sources(query, limit=5)
+                
+            def _fetch_db_usage():
+                try:
+                    from database.db import get_connection
+                    from services.analytics_service import get_history
+                    history = get_history("weekly")
+                    with get_connection() as conn:
+                        devices = conn.execute("SELECT name, power_usage_w FROM devices WHERE status='ON'").fetchall()
+                    dev_str = ", ".join([f"{d['name']} ({d['power_usage_w']}W)" for d in devices])
+                    return f"Weekly History: {json.dumps(history)}. Active Devices: {dev_str}"
+                except Exception:
+                    return ""
+
+            chroma_task = asyncio.to_thread(_fetch_chroma)
+            db_task = asyncio.to_thread(_fetch_db_usage)
+            
+            chroma_result, usage_context = await asyncio.gather(chroma_task, db_task)
+            chunks, sources = chroma_result
+            context = "\n".join(chunks) if chunks else "No context retrieved."
+            
+            if not chunks:
+                result = "I don't have that information."
+            else:
+                # Generate answer directly using system instruction and context
+                prompt_text = f"Knowledge Base Context:\n{context}\n\n"
+                if usage_context:
+                    prompt_text += f"Usage Context:\n{usage_context}\n\n"
+                prompt_text += f"User Query:\n{query}"
+                
+                response = await client.aio.models.generate_content(
+                    model=model_name,
+                    contents=[Content(role="user", parts=[Part(text=prompt_text)])],
+                    config={"system_instruction": ADVISOR_AGENT_INSTRUCTION}
+                )
+                result = response.text.strip()
             
             # --- LLM-AS-A-JUDGE UI INTEGRATION ---
-            if result:
-                try:
-                    client = genai.Client()
-                    chunks = retrieve_chroma_chunks(query, limit=3)
-                    context = "\n".join(chunks) if chunks else "No context retrieved."
-                    
-                    judge_prompt_text = JUDGE_PROMPT.format(
-                        question=query,
-                        context=context,
-                        answer=result
-                    )
-                    
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=judge_prompt_text
-                    )
-                    
-                    result_text = response.text.replace("```json", "").replace("```", "").strip()
-                    score = json.loads(result_text)
-                    f_score = score.get("faithfulness", 0)
-                    r_score = score.get("relevance", 0)
-                    
-                    result += f" ___EVAL:{f_score},{r_score}___"
-                except Exception as eval_err:
-                    logger.warning("Judge evaluation failed: %s", eval_err)
+            if result and result != "I don't have that information.":
+                import base64
+                sources_str = ",".join(sources) if sources else "unknown"
+                query_b64 = base64.b64encode(query.encode("utf-8")).decode("utf-8")
+                context_b64 = base64.b64encode(context.encode("utf-8")).decode("utf-8")
+                result += f" ___JUDGE_DATA:{query_b64}:{sources_str}:{context_b64}___"
             # ---------------------------------------------
             
             return result
