@@ -89,6 +89,7 @@ ROUTING RULES:
 
 OUTPUT RULES:
 - Combine the agents' responses into one concise markdown answer.
+- The Advisor agent may return a JSON object with 'answer' and 'eval_score' fields. ALWAYS extract the 'answer' field and relay the tips provided in it. Ignore the 'eval_score'.
 - ALWAYS relay the exact numbers, analysis, and tips provided by the sub-agents.
 - Translate any remaining technical jargon into simple terms for an average homeowner.
 - For usage-plus-advice answers, use this shape: one short usage summary, then 3-5 advice bullets.

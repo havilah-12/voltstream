@@ -93,6 +93,8 @@ export function messageSpecifiesDevice(message, devicesForType) {
       device.name,
       `${device.name} ${device.location ?? ""}`,
       `${getDeviceType(device)} ${device.location ?? ""}`,
+      `${device.location ?? ""} ${device.name}`,
+      `${device.location ?? ""} ${getDeviceType(device)}`,
     ];
     return specificValues.some((value) => {
       const normalizedValue = normalizeTypeKey(value);

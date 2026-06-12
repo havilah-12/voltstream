@@ -13,7 +13,9 @@ from prompts import ANALYST_AGENT_INSTRUCTION
 
 from services.analytics_service import get_history
 from utils.decorators import tool_annotation
+from opentelemetry import trace
 
+tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
 
 # The analyst agent gets three separate tool annotations for better clarity and routing:
@@ -29,6 +31,7 @@ logger = logging.getLogger(__name__)
     parameters={"period": "Must be 'daily' (for specific days of week), 'weekly', or 'monthly'."},
     returns="JSON string containing historical energy usage data.",
 )
+@tracer.start_as_current_span("fetch_usage_history")
 def fetch_usage_history(period: str) -> str:
     """Fetch usage history (grid and solar data) for a given period."""
     if period not in {"daily", "weekly", "monthly"}:
@@ -45,6 +48,7 @@ def fetch_usage_history(period: str) -> str:
     parameters={},
     returns="JSON string containing list of active devices and their power usage.",
 )
+@tracer.start_as_current_span("fetch_device_power_usage")
 def fetch_device_power_usage() -> str:
     """Fetch the real-time power usage (in Watts) of all devices currently active in the home."""
     from database.db import get_connection
@@ -61,6 +65,7 @@ def fetch_device_power_usage() -> str:
     parameters={"period": "Must be one of 'daily', 'weekly', or 'monthly'."},
     returns="JSON string containing historical device consumption data.",
 )
+@tracer.start_as_current_span("fetch_device_historical_usage")
 def fetch_device_historical_usage(period: str) -> str:
     """Fetch historical energy consumption (in kWh) for individual devices over a given period."""
     if period not in {"daily", "weekly", "monthly"}:
@@ -106,12 +111,13 @@ _sessions = InMemorySessionService()
     parameters={"query": "What to ask the analyst agent (e.g. 'What was the peak grid usage last week?')."},
     returns="String containing the analysis result.",
 )
+@tracer.start_as_current_span("call_analyst_agent")
 async def call_analyst_agent(query: str) -> str:
     """Consult the Analyst Agent to analyze historical energy usage data."""
     for attempt in range(3):
         try:
             if attempt > 0:
-                await asyncio.sleep(15)
+                await asyncio.sleep(2) # OPTIMIZED from 15s to 2s
                 
             session_id = uuid4().hex
             await _sessions.create_session(app_name="voltstream", user_id="user", session_id=session_id)

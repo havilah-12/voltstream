@@ -9,6 +9,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers import device_agent, analytics, billing, chat, dashboard, devices, orchestrator_agent
 
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("voltstream")
 
@@ -61,5 +68,21 @@ def root():
     return {"message": "VoltStream API is running"}
 
 
+def configure_tracing(api: FastAPI) -> None:
+    resource = Resource.create(attributes={
+        "service.name": "voltstream-backend"
+    })
+    provider = TracerProvider(resource=resource)
+    
+    if os.getenv("ENABLE_TRACING", "false").lower() == "true":
+        processor = BatchSpanProcessor(OTLPSpanExporter())
+        provider.add_span_processor(processor)
+        
+    trace.set_tracer_provider(provider)
+    
+    FastAPIInstrumentor.instrument_app(api)
+
+
 configure_middleware(app)
 register_routes(app)
+configure_tracing(app)

@@ -10,9 +10,9 @@ from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
-from prompts import ADVISOR_AGENT_INSTRUCTION, JUDGE_PROMPT
+from prompts import ADVISOR_AGENT_INSTRUCTION
 
-from services.chroma_service import retrieve_chroma_chunks, retrieve_chroma_chunks_with_sources
+from services.chroma_service import retrieve_chroma_chunks
 from utils.decorators import tool_annotation
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 )
 def search_energy_knowledge_base(query: str) -> str:
     """Search the VoltStream energy knowledge base for tips and advice."""
-    chunks = retrieve_chroma_chunks(query, limit=3)
+    chunks = retrieve_chroma_chunks(query, limit=5)
     if not chunks:
         return "No relevant advice found in the knowledge base."
     return "\n".join(chunks)
@@ -63,13 +63,9 @@ async def call_advisor_agent(query: str) -> str:
     for attempt in range(3):
         try:
             if attempt > 0:
-                await asyncio.sleep(15)
+                await asyncio.sleep(2)
                 
-            client = genai.Client()
-            
-            # Retrieve context from ChromaDB and database in parallel
-            def _fetch_chroma():
-                return retrieve_chroma_chunks_with_sources(query, limit=5)
+            client = genai.Client(http_options={'timeout': 10000})
                 
             def _fetch_db_usage():
                 try:
@@ -83,40 +79,35 @@ async def call_advisor_agent(query: str) -> str:
                 except Exception:
                     return ""
 
-            chroma_task = asyncio.to_thread(_fetch_chroma)
-            db_task = asyncio.to_thread(_fetch_db_usage)
+            usage_context = await asyncio.to_thread(_fetch_db_usage)
             
-            chroma_result, usage_context = await asyncio.gather(chroma_task, db_task)
-            chunks, sources = chroma_result
-            context = "\n".join(chunks) if chunks else "No context retrieved."
+            prompt_text = ""
+            if usage_context:
+                prompt_text += f"Usage Context:\n{usage_context}\n\n"
+            prompt_text += f"User Query:\n{query}"
+
+            session_id = uuid4().hex
+            await _sessions.create_session(app_name="voltstream", user_id="user", session_id=session_id)
+            runner = Runner(agent=advisor_agent, app_name="voltstream", session_service=_sessions)
             
-            if not chunks:
+            result = ""
+            async for event in runner.run_async(
+                user_id="user", 
+                session_id=session_id, 
+                new_message=Content(role="user", parts=[Part(text=prompt_text)])
+            ):
+                if event.is_final_response():
+                    parts = event.content and event.content.parts
+                    result = "".join(p.text for p in parts if getattr(p, "text", None)).strip() if parts else ""
+
+            if not result:
                 result = "I don't have that information."
-            else:
-                # Generate answer directly using system instruction and context
-                prompt_text = f"Knowledge Base Context:\n{context}\n\n"
-                if usage_context:
-                    prompt_text += f"Usage Context:\n{usage_context}\n\n"
-                prompt_text += f"User Query:\n{query}"
-                
-                response = await client.aio.models.generate_content(
-                    model=model_name,
-                    contents=[Content(role="user", parts=[Part(text=prompt_text)])],
-                    config={"system_instruction": ADVISOR_AGENT_INSTRUCTION}
-                )
-                result = response.text.strip()
             
-            # --- LLM-AS-A-JUDGE UI INTEGRATION ---
-            if result and result != "I don't have that information.":
-                import base64
-                sources_str = ",".join(sources) if sources else "unknown"
-                query_b64 = base64.b64encode(query.encode("utf-8")).decode("utf-8")
-                context_b64 = base64.b64encode(context.encode("utf-8")).decode("utf-8")
-                result += f" ___JUDGE_DATA:{query_b64}:{sources_str}:{context_b64}___"
-            # ---------------------------------------------
+            return json.dumps({
+                "answer": result
+            })
             
-            return result
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 continue
-            return f"Error: {str(e)}"
+            return json.dumps({"answer": f"Error: {str(e)}"})

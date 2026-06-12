@@ -230,15 +230,6 @@ export default function SmartControl() {
 
     if (intent === "SCHEDULE") {
       options.hideLoadingPanel = true;
-      options.isOptimisticSchedule = true;
-      const action = getAgentAction(message) || "ON";
-      const targetName = options.targetName ?? getMentionedDeviceType(message) ?? "device";
-      notify({
-        type: "success",
-        title: "Action Completed",
-        message: `${targetName} scheduled to turn ${action.toLowerCase()} successfully.`,
-        silent: true,
-      });
     }
 
     if (!options.hideLoadingPanel) {
@@ -304,7 +295,7 @@ export default function SmartControl() {
       console.log("Agent result:", result);
       console.log("Local events:", localEvents);
       
-      if (result.isDone && !result.isError && !options.isOptimisticSchedule) {
+      if (result.isDone && !result.isError) {
         let finalText;
         
         if (result.errorMessage) {
@@ -361,35 +352,7 @@ export default function SmartControl() {
       ? devices.filter((device) => getDeviceType(device) === mentionedType)
       : [];
 
-    let targetDevice = null;
-    if (devicesForType.length === 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
-      targetDevice = devicesForType[0];
-    } else if (devicesForType.length > 0) {
-      const specifiedDevices = devicesForType.filter(d => messageSpecifiesDevice(trimmedMessage, [d]));
-      if (specifiedDevices.length === 1) {
-        targetDevice = specifiedDevices[0];
-      }
-    }
-
     const timingPhrase = getTimingPhrase(trimmedMessage);
-    if (action && targetDevice) {
-      if (targetDevice.status?.toUpperCase() === action) {
-        setAgentEvents([{ event: "answer", data: { answer: `${canonicalizeDeviceName(targetDevice)} is already ${action}.` } }]);
-        setAgentChoice(null);
-        setAgentIntent(action);
-        setAgentTargetName(canonicalizeDeviceName(targetDevice));
-        setAgentTargetType(getDeviceType(targetDevice));
-        setAgentLoading(false);
-        setAgentMessage("");
-        notify({
-          type: "success",
-          title: "Action Completed",
-          message: `${canonicalizeDeviceName(targetDevice)} was already ${action.toUpperCase()}`,
-          silent: true,
-        });
-        return;
-      }
-    }
 
     const isAll = trimmedMessage.toLowerCase().includes("all");
     if (action && !mentionedType && !isAll) {
@@ -420,6 +383,31 @@ export default function SmartControl() {
         devices: devicesForType,
         timingText: getTimingPhrase(trimmedMessage),
       });
+      return;
+    }
+
+    let targetDevice = null;
+    if (devicesForType.length === 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
+      targetDevice = devicesForType[0];
+    } else if (devicesForType.length > 0) {
+      const specifiedDevices = devicesForType.filter((d) => messageSpecifiesDevice(trimmedMessage, [d]));
+      if (specifiedDevices.length === 1) {
+        targetDevice = specifiedDevices[0];
+      }
+    }
+
+    if (targetDevice && targetDevice.status === action && !timingPhrase) {
+      setAgentTargetName(targetDevice.name);
+      setAgentTargetType(getDeviceType(targetDevice));
+      setAgentError("");
+      setAgentIntent(action);
+      setAgentChoice(null);
+      setHideScheduleLoadingPanel(Boolean(options.hideLoadingPanel));
+      
+      const isAlreadyOn = targetDevice.status === "ON";
+      setAgentEvents([
+        { event: "answer", data: { answer: `${targetDevice.name} is already ${isAlreadyOn ? "ON" : "OFF"}.` } }
+      ]);
       return;
     }
 
@@ -856,7 +844,7 @@ export default function SmartControl() {
                 <button
                   type="button"
                   onClick={scheduleAgent}
-                  disabled={agentLoading || !scheduleButtonEnabled}
+                  disabled={!scheduleButtonEnabled || agentLoading}
                   className="flex min-h-[50px] items-center justify-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-5 text-sm font-bold text-[var(--volt-yellow)] transition-all hover:bg-[var(--volt-yellow)] hover:text-black disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
                 >
                   <CalendarClock size={18} />
@@ -961,14 +949,14 @@ export default function SmartControl() {
                             ? `${agentTargetName} scheduled to turn ${actualAction} ${userTimeText}.`
                             : `${agentTargetName} scheduled to turn ${actualAction}.`;
                         } else {
-                          finalText = agentResult.answerText || agentResult.errorMessage || `${agentTargetName} turned ${actualAction} successfully.`;
-                          // Add successfully if not present and not "already"
-                          if (!finalText.toLowerCase().includes("successfully") && !finalText.toLowerCase().includes("already")) {
-                            finalText = finalText.replace(/\.$/, "") + " successfully.";
-                          }
-                          const suffix = totalPower >= 1000 ? " Watch out devices!" : "";
-                          if (suffix && !finalText.includes("already") && !finalText.includes("Watch out")) {
-                            finalText = finalText + suffix;
+                          if (agentResult.answerText) {
+                            finalText = agentResult.answerText;
+                          } else if (agentResult.errorMessage) {
+                            finalText = agentResult.errorMessage;
+                          } else {
+                            finalText = `${agentTargetName} turned ${actualAction} successfully.`;
+                            const suffix = totalPower >= 1000 ? " Watch out devices!" : "";
+                            finalText += suffix;
                           }
                         }
                       }

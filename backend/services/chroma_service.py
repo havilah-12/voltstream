@@ -10,7 +10,9 @@ from chromadb.config import Settings
 from google import genai
 
 from config import get_settings
+from opentelemetry import trace
 
+tracer = trace.get_tracer(__name__)
 logger = logging.getLogger("voltstream")
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -47,9 +49,10 @@ def _load_documents() -> list[dict]:
 
 class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
     def __init__(self, model_name: str):
-        self._client = genai.Client()
+        self._client = genai.Client(http_options={'timeout': 10000})
         self._model_name = model_name.removeprefix("models/")
 
+    @tracer.start_as_current_span("gemini_embedding")
     def __call__(self, input: Documents) -> Embeddings:
         try:
             texts = [input] if isinstance(input, str) else list(input)
@@ -84,20 +87,17 @@ def _get_collection():
         settings=Settings(anonymized_telemetry=False)
     )
     
-    # Try to load existing collection to avoid re-embedding
     try:
-        collection = client.get_collection(name=settings.chroma_collection_name)
+        collection = client.get_or_create_collection(
+            name=settings.chroma_collection_name,
+            metadata={"source": "voltstream_energy_guide"},
+        )
         if collection.count() > 0:
             logger.info("Loaded existing Chroma collection with %s chunks.", collection.count())
             return collection
-    except Exception:
-        pass
-
-    logger.info("Creating new Chroma collection and indexing documents...")
-    collection = client.create_collection(
-        name=settings.chroma_collection_name,
-        metadata={"source": "voltstream_energy_guide"},
-    )
+    except Exception as e:
+        logger.error(f"Failed to get_or_create_collection: {e}")
+        return None
 
     docs = _load_documents()
     documents = []
@@ -133,7 +133,8 @@ def _get_collection():
     return collection
 
 
-def retrieve_chroma_chunks_with_sources(question: str, limit: int = 3) -> tuple[list[str], list[str]]:
+@lru_cache(maxsize=100)
+def _cached_retrieve(question: str, limit: int) -> tuple[list[str], list[str]]:
     collection = _get_collection()
     if collection is None:
         return [], []
@@ -158,6 +159,10 @@ def retrieve_chroma_chunks_with_sources(question: str, limit: int = 3) -> tuple[
         sources = list({m.get("source", "Unknown") for m in metadatas[0]})
         
     return docs, sources
+
+@tracer.start_as_current_span("retrieve_chroma_chunks_with_sources")
+def retrieve_chroma_chunks_with_sources(question: str, limit: int = 3) -> tuple[list[str], list[str]]:
+    return _cached_retrieve(question, limit)
 
 def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
     docs, _ = retrieve_chroma_chunks_with_sources(question, limit)

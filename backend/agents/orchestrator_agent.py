@@ -53,6 +53,7 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
     yield _sse("status", {"message": "Orchestrator started."})
 
     import asyncio
+    advisor_query = None
     judge_task = None
 
     try:
@@ -63,47 +64,48 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
         ):
             for call in event.get_function_calls():
                 yield _sse("tool_call", {"name": call.name, "args": call.args})
+                if call.name == "call_advisor_agent":
+                    advisor_query = call.args.get("query", "")
             for resp in event.get_function_responses():
                 yield _sse("tool_response", {"name": resp.name})
                 if resp.name == "call_advisor_agent":
                     if isinstance(resp.response, dict) and "result" in resp.response:
                         resp_str = str(resp.response["result"])
-                        match = re.search(r' ___JUDGE_DATA:(.*?):(.*?):(.*?)(?:___|$)', resp_str)
-                        if match:
-                            query_b64, sources_str, context_b64 = match.groups()
-                            
-                            # strip the judge data from the string so the Orchestrator LLM doesn't see it
-                            resp.response["result"] = resp_str.replace(match.group(0), "").strip()
-                            advisor_answer = str(resp.response["result"])
-                            
-                            # Start judge task in background
-                            import base64
-                            from google import genai
-                            from prompts import JUDGE_PROMPT
-                            
-                            query = base64.b64decode(query_b64).decode("utf-8")
-                            context = base64.b64decode(context_b64).decode("utf-8")
-                            
-                            async def run_judge(q, ctx, ans, srcs):
-                                try:
-                                    client = genai.Client()
-                                    judge_prompt_text = JUDGE_PROMPT.format(question=q, context=ctx, answer=ans)
-                                    response = await client.aio.models.generate_content(
-                                        model=model_name,
-                                        contents=judge_prompt_text
-                                    )
-                                    result_text = response.text.replace("```json", "").replace("```", "").strip()
-                                    score = json.loads(result_text)
-                                    return {
-                                        "faithfulness": int(score.get("faithfulness", 0)),
-                                        "relevance": int(score.get("relevance", 0)),
-                                        "sources": srcs.split(",") if srcs and srcs != "unknown" else []
-                                    }
-                                except Exception as e:
-                                    logger.warning("Judge failed: %s", e)
-                                    return None
+                        try:
+                            data = json.loads(resp_str)
+                            if "answer" in data:
+                                resp.response["result"] = data["answer"]
+                                
+                                if advisor_query and data["answer"] != "I don't have that information.":
+                                    from services.chroma_service import retrieve_chroma_chunks_with_sources
+                                    from prompts import JUDGE_PROMPT
+                                    from google import genai
                                     
-                            judge_task = asyncio.create_task(run_judge(query, context, advisor_answer, sources_str))
+                                    async def run_judge(q, ans):
+                                        try:
+                                            client = genai.Client(http_options={'timeout': 10000})
+                                            chunks, sources = await asyncio.to_thread(retrieve_chroma_chunks_with_sources, q, 5)
+                                            context = "\n".join(chunks) if chunks else "No context retrieved."
+                                            judge_prompt_text = JUDGE_PROMPT.format(question=q, context=context, answer=ans)
+                                            response = await client.aio.models.generate_content(
+                                                model=model_name,
+                                                contents=judge_prompt_text
+                                            )
+                                            result_text = response.text.replace("```json", "").replace("```", "").strip()
+                                            score = json.loads(result_text)
+                                            sources_str = ",".join(sources) if sources else "unknown"
+                                            return {
+                                                "faithfulness": int(score.get("faithfulness", 0)),
+                                                "relevance": int(score.get("relevance", 0)),
+                                                "sources": sources_str.split(",") if sources_str and sources_str != "unknown" else []
+                                            }
+                                        except Exception as e:
+                                            logger.warning("Judge failed: %s", e)
+                                            return None
+                                            
+                                    judge_task = asyncio.create_task(run_judge(advisor_query, data["answer"]))
+                        except json.JSONDecodeError:
+                            pass
 
             # Stream intermediate text chunks
             if not event.is_final_response() and not event.get_function_calls() and not event.get_function_responses():
@@ -117,12 +119,12 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
                 text = "".join(p.text for p in parts if getattr(p, "text", None)).strip() if parts else ""
                 if text:
                     yield _sse("answer", {"answer": text})
-                    
-        # After stream finishes, await judge_task if it exists so we can yield eval_score
+
         if judge_task:
             judge_result = await judge_task
             if judge_result:
                 yield _sse("eval_score", judge_result)
+
 
     except Exception as exc:
         logger.exception("Orchestrator error: %s", exc)

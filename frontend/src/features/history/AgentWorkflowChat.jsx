@@ -36,7 +36,7 @@ function formatInline(text) {
   html = html.replace(/^#\s+(.*)/gm, '<div class="text-base font-semibold text-[var(--volt-yellow)] mb-2 mt-4">$1</div>');
   
   // Auto-highlight bullet side headings (e.g. "Monitor and Control Usage:")
-  html = html.replace(/^([A-Za-z0-9\s\-&]+):/g, '<strong class="font-bold text-[var(--volt-yellow)]">$1:</strong>');
+  html = html.replace(/^([A-Za-z0-9\s\-&(),.'"/]+):/g, '<strong class="font-bold text-[var(--volt-yellow)]">$1:</strong>');
   
   // Auto-highlight numerical energy/time values
   html = html.replace(/(\d+(?:\.\d+)?\s*(?:kWh|W|kW|hours|minutes|seconds|days|weeks|months|years|%))/gi, '<strong class="font-bold text-[var(--volt-yellow)]">$1</strong>');
@@ -115,6 +115,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
     let finalAnswer = "";
     let currentEval = null;
     const assistantMsgId = Date.now().toString() + "-ast";
+    const startTime = Date.now();
 
     try {
       await runOrchestratorAgent(trimmed, {
@@ -125,7 +126,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
             setSessionId(parsed.data.session_id);
           } else if (parsed.event === "tool_call") {
             const toolName = formatAgentName(parsed.data.name);
-            setActiveTools((prev) => [...prev, { id: Date.now().toString(), name: toolName, status: "running" }]);
+            setActiveTools((prev) => [...prev, { id: Date.now().toString() + "-" + parsed.data.name, name: toolName, status: "running" }]);
           } else if (parsed.event === "tool_response") {
             const toolName = formatAgentName(parsed.data.name);
             setActiveTools((prev) => {
@@ -152,38 +153,26 @@ export default function AgentWorkflowChat({ open, onClose }) {
                 return [...prev, { id: assistantMsgId, role: "assistant", text: finalAnswer }];
               }
             });
-            setActiveTools((prev) => {
-              if (prev.length > 0 && !prev.some(t => t.name === "Response")) {
-                return [...prev, { id: "gen-resp", name: "Response", status: "running" }];
-              }
-              return prev;
-            });
+            setActiveTools([]);
           } else if (parsed.event === "answer") {
             finalAnswer = parsed.data.answer;
-            setActiveTools((prev) => {
-              const updated = [...prev];
-              for (let i = updated.length - 1; i >= 0; i--) {
-                if (updated[i].name === "Response") {
-                  updated[i].status = "done";
-                  break;
-                }
-              }
-              return updated;
-            });
+            setActiveTools([]);
           } else if (parsed.event === "eval_score") {
             currentEval = parsed.data;
           }
         },
       });
 
+      const latencySeconds = ((Date.now() - startTime) / 1000).toFixed(1);
+
       if (finalAnswer) {
-        agentCacheRef.current[trimmed] = { text: finalAnswer, evalScore: currentEval };
+        agentCacheRef.current[trimmed] = { text: finalAnswer, evalScore: currentEval, latency: latencySeconds };
         setMessages((prev) => {
           const msgExists = prev.some(m => m.id === assistantMsgId);
           if (msgExists) {
-            return prev.map(m => m.id === assistantMsgId ? { ...m, text: finalAnswer, evalScore: currentEval } : m);
+            return prev.map(m => m.id === assistantMsgId ? { ...m, text: finalAnswer, evalScore: currentEval, latency: latencySeconds } : m);
           } else {
-            return [...prev, { id: assistantMsgId, role: "assistant", text: finalAnswer, evalScore: currentEval }];
+            return [...prev, { id: assistantMsgId, role: "assistant", text: finalAnswer, evalScore: currentEval, latency: latencySeconds }];
           }
         });
       } else {
@@ -201,7 +190,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
       }
     } finally {
       setLoading(false);
-      setTimeout(() => setActiveTools([]), 2000);
+      setActiveTools([]);
     }
   };
 
@@ -230,8 +219,12 @@ export default function AgentWorkflowChat({ open, onClose }) {
 
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+          {messages.map((msg, index) => {
+            const isLastUserMsg = msg.role === "user" && (index === messages.length - 1 || index === messages.length - 2);
+            
+            return (
+            <div key={msg.id} className="space-y-6">
+              <div className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[85%] rounded-2xl px-5 py-4 ${
                   msg.role === "user"
@@ -240,11 +233,18 @@ export default function AgentWorkflowChat({ open, onClose }) {
                 }`}
               >
                 {msg.role === "assistant" && (
-                  <div className="mb-2 flex items-center gap-2 border-b border-zinc-800/50 pb-2">
-                    <Network size={16} className="text-[var(--volt-yellow)]" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      Smart Advisor
-                    </span>
+                  <div className="mb-2 flex items-center justify-between border-b border-zinc-800/50 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Network size={16} className="text-[var(--volt-yellow)]" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Smart Advisor
+                      </span>
+                    </div>
+                    {msg.latency && (
+                      <span className="text-[10px] text-zinc-500 font-mono bg-black/30 px-1.5 py-0.5 rounded">
+                        {msg.latency}s
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="text-sm leading-relaxed">
@@ -286,42 +286,44 @@ export default function AgentWorkflowChat({ open, onClose }) {
                 )}
               </div>
             </div>
-          ))}
 
-          {/* Active Tools Display */}
-          {activeTools.length > 0 && (
-            <div className="flex justify-start">
-              <div className="max-w-[85%] rounded-2xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-5 py-4 rounded-tl-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  {activeTools.every((t) => t.status === "done") ? (
-                    <CheckCircle2 size={16} className="text-emerald-400" />
-                  ) : (
-                    <Cpu size={16} className="animate-pulse text-[var(--volt-yellow)]" />
-                  )}
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${activeTools.every((t) => t.status === "done") ? "text-emerald-400" : "text-[var(--volt-yellow)]"}`}>
-                    {activeTools.every((t) => t.status === "done") ? "Tasks Completed" : "Working on it"}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {activeTools.map((tool) => (
-                    <div key={tool.id} className="flex items-center gap-3 rounded-lg bg-black/40 px-3 py-2">
-                      {tool.status === "running" ? (
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-[var(--volt-yellow)]" />
-                      ) : (
-                        <CheckCircle2 size={16} className="text-emerald-400" />
-                      )}
-                      <span className="text-sm text-zinc-300">
-                        {tool.name === "Response" 
-                          ? (tool.status === "running" ? "Generating " : "Generated ") 
-                          : (tool.status === "running" ? "Getting " : "Got ")}
-                        <strong className="font-medium text-white">{tool.name}</strong>...
-                      </span>
-                    </div>
-                  ))}
+            {/* Active Tools Display - Rendered after the last user message, BEFORE the assistant answer */}
+            {isLastUserMsg && activeTools.length > 0 && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] px-5 py-4 rounded-tl-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    {activeTools.every((t) => t.status === "done") ? (
+                      <CheckCircle2 size={16} className="text-emerald-400" />
+                    ) : (
+                      <Cpu size={16} className="animate-pulse text-[var(--volt-yellow)]" />
+                    )}
+                    <span className={`text-xs font-semibold uppercase tracking-wider ${activeTools.every((t) => t.status === "done") ? "text-emerald-400" : "text-[var(--volt-yellow)]"}`}>
+                      {activeTools.every((t) => t.status === "done") ? "Tasks Completed" : "Working on it"}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {activeTools.map((tool) => (
+                      <div key={tool.id} className="flex items-center gap-3 rounded-lg bg-black/40 px-3 py-2">
+                        {tool.status === "running" ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-600 border-t-[var(--volt-yellow)]" />
+                        ) : (
+                          <CheckCircle2 size={16} className="text-emerald-400" />
+                        )}
+                        <span className="text-sm text-zinc-300">
+                          {tool.name === "Response" 
+                            ? (tool.status === "running" ? "Generating " : "Generated ") 
+                            : (tool.status === "running" ? "Getting " : "Got ")}
+                          <strong className="font-medium text-white">{tool.name}</strong>...
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+            )}
             </div>
-          )}
+            );
+          })}
 
           {/* Generic Thinking Loader */}
           {loading && activeTools.length === 0 && (

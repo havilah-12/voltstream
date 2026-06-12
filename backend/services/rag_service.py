@@ -6,7 +6,7 @@ from services.chroma_service import retrieve_chroma_chunks
 from services.gemini_service import ask_gemini
 
 OUT_OF_SCOPE_ANSWER = "I don't have that information."
-GUIDE_CHUNK_LIMIT = 3
+GUIDE_CHUNK_LIMIT = 5
 
 
 def _fetch_billing_context(connection) -> str | None:
@@ -133,13 +133,8 @@ def _get_sql_context(query: str = "") -> list[str]:
 
 
 def answer_qa(request: ChatRequest) -> ChatResponse:
-    from concurrent.futures import ThreadPoolExecutor
-    # Run Chroma retrieval and SQL context fetching in parallel to save time
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_chroma = executor.submit(retrieve_chroma_chunks, request.question, GUIDE_CHUNK_LIMIT)
-        future_sql = executor.submit(_get_sql_context, request.question)
-        guide_chunks = future_chroma.result()
-        sql_chunks = future_sql.result()
+    guide_chunks = retrieve_chroma_chunks(request.question, GUIDE_CHUNK_LIMIT)
+    sql_chunks = _get_sql_context(request.question)
     
     context_chunks = guide_chunks + sql_chunks
     
