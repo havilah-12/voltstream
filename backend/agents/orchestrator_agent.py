@@ -66,6 +66,7 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
                 yield _sse("tool_call", {"name": call.name, "args": call.args})
                 if call.name == "call_advisor_agent":
                     advisor_query = call.args.get("query", "")
+                    logger.info(f"[AGENT TRACE] Orchestrator routing query to Advisor Agent: '{advisor_query}'")
             for resp in event.get_function_responses():
                 yield _sse("tool_response", {"name": resp.name})
                 if resp.name == "call_advisor_agent":
@@ -82,6 +83,7 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
                                     from google import genai
                                     
                                     async def run_judge(q, ans):
+                                        logger.info(f"[AGENT TRACE] Starting LLM Judge evaluation for query: '{q}'")
                                         try:
                                             client = genai.Client(http_options={'timeout': 10000})
                                             chunks, sources = await asyncio.to_thread(retrieve_chroma_chunks_with_sources, q, 5)
@@ -94,6 +96,7 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
                                             result_text = response.text.replace("```json", "").replace("```", "").strip()
                                             score = json.loads(result_text)
                                             sources_str = ",".join(sources) if sources else "unknown"
+                                            logger.info(f"[AGENT TRACE] LLM Judge completed evaluation. Score: {score}")
                                             return {
                                                 "faithfulness": int(score.get("faithfulness", 0)),
                                                 "relevance": int(score.get("relevance", 0)),

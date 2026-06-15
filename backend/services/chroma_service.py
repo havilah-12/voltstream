@@ -162,7 +162,9 @@ def _cached_retrieve(question: str, limit: int) -> tuple[list[str], list[str]]:
 
 @tracer.start_as_current_span("retrieve_chroma_chunks_with_sources")
 def retrieve_chroma_chunks_with_sources(question: str, limit: int = 3) -> tuple[list[str], list[str]]:
-    return _cached_retrieve(question, limit)
+    docs, sources = _cached_retrieve(question, limit)
+    logger.info(f"[AGENT TRACE] ChromaDB retrieved {len(docs)} chunks from sources: {sources}")
+    return docs, sources
 
 def retrieve_chroma_chunks(question: str, limit: int = 3) -> list[str]:
     docs, _ = retrieve_chroma_chunks_with_sources(question, limit)

@@ -3,6 +3,9 @@ from prompts import QA_PROMPT_TEMPLATE
 from schemas.chat import ChatRequest, ChatResponse
 from services.chroma_service import retrieve_chroma_chunks
 from services.gemini_service import ask_gemini
+import logging
+
+logger = logging.getLogger("voltstream")
 
 OUT_OF_SCOPE_ANSWER = "I don't have that information."
 GUIDE_CHUNK_LIMIT = 5
@@ -119,14 +122,18 @@ async def _get_sql_context(query: str = "") -> list[str]:
 
 
 async def answer_qa(request: ChatRequest) -> ChatResponse:
+    logger.info(f"[AGENT TRACE] Basic RAG processing query: '{request.question}'")
     guide_chunks = retrieve_chroma_chunks(request.question, GUIDE_CHUNK_LIMIT)
     sql_chunks = await _get_sql_context(request.question)
     
+    logger.info(f"[AGENT TRACE] Basic RAG retrieved {len(guide_chunks)} guide chunks and {len(sql_chunks)} SQL chunks.")
     context_chunks = guide_chunks + sql_chunks
     
     if not context_chunks:
+        logger.info(f"[AGENT TRACE] Basic RAG found no context. Returning out-of-scope.")
         return ChatResponse(answer=OUT_OF_SCOPE_ANSWER, sources=[], used_gemini=False)
 
+    logger.info(f"[AGENT TRACE] Basic RAG invoking Gemini with combined context...")
     answer = ask_gemini(
         request.question,
         context_chunks,
@@ -134,6 +141,8 @@ async def answer_qa(request: ChatRequest) -> ChatResponse:
         out_of_scope_answer=OUT_OF_SCOPE_ANSWER,
     )
     if not answer:
+        logger.info(f"[AGENT TRACE] Gemini returned empty answer.")
         return ChatResponse(answer=OUT_OF_SCOPE_ANSWER, sources=context_chunks, used_gemini=False)
 
+    logger.info(f"[AGENT TRACE] Gemini returned successfully generated answer.")
     return ChatResponse(answer=answer, sources=context_chunks, used_gemini=True)

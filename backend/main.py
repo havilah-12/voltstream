@@ -20,6 +20,9 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("voltstream")
 
+# Completely remove ChromaDB telemetry module from running
+os.environ["CHROMA_TELEMETRY_IMPL"] = "chromadb.telemetry.product.null.NullTelemetry"
+
 
 @asynccontextmanager
 async def lifespan(api: FastAPI):

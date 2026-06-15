@@ -27,8 +27,10 @@ logger = logging.getLogger(__name__)
 )
 def search_energy_knowledge_base(query: str) -> str:
     """Search the VoltStream energy knowledge base for tips and advice."""
+    logger.info(f"[AGENT TRACE] Advisor Agent searching knowledge base for: '{query}'")
     chunks = retrieve_chroma_chunks(query, limit=5)
     if not chunks:
+        logger.info(f"[AGENT TRACE] No chunks found for query: '{query}'")
         return "No relevant advice found in the knowledge base."
     return "\n".join(chunks)
 
@@ -86,6 +88,7 @@ async def call_advisor_agent(query: str) -> str:
 
             session_id = uuid4().hex
             await _sessions.create_session(app_name="voltstream", user_id="user", session_id=session_id)
+            logger.info(f"[AGENT TRACE] Advisor Agent invoking model '{model_name}' with prompt:\n{prompt_text}")
             runner = Runner(agent=advisor_agent, app_name="voltstream", session_service=_sessions)
             
             result = ""
