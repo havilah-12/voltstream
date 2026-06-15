@@ -1,18 +1,10 @@
-from database.db import get_connection
+from database.db import get_firestore_client
 
-
-def get_billing_summary():
-    with get_connection() as connection:
-        row = connection.execute(
-            """
-            SELECT
-                current_balance,
-                projected_bill,
-                budget_limit,
-                current_grid_data_usage,
-                solar_energy_usage
-            FROM billing_summary
-            WHERE id = 1
-            """
-        ).fetchone()
-    return dict(row) if row else {}
+async def get_billing_summary():
+    db = get_firestore_client()
+    doc = await db.collection("billing_summary").document("1").get()
+    if doc.exists:
+        data = doc.to_dict()
+        data.pop("id", None)
+        return data
+    return {}

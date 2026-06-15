@@ -1,9 +1,11 @@
-from database.db import get_connection
+from database.db import get_firestore_client
 
-
-def get_live_dashboard():
-    with get_connection() as connection:
-        row = connection.execute(
-            "SELECT grid_draw_kw, solar_generation_kw, net_usage_kw FROM dashboard_live WHERE id = 1"
-        ).fetchone()
-    return dict(row) if row else {}
+async def get_live_dashboard():
+    db = get_firestore_client()
+    doc = await db.collection("dashboard_live").document("1").get()
+    if doc.exists:
+        data = doc.to_dict()
+        # Ensure we don't send the ID if it was stored
+        data.pop("id", None)
+        return data
+    return {}

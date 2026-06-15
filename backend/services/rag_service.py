@@ -1,5 +1,4 @@
-
-from database.db import get_connection
+from database.db import get_firestore_client
 from prompts import QA_PROMPT_TEMPLATE
 from schemas.chat import ChatRequest, ChatResponse
 from services.chroma_service import retrieve_chroma_chunks
@@ -9,29 +8,23 @@ OUT_OF_SCOPE_ANSWER = "I don't have that information."
 GUIDE_CHUNK_LIMIT = 5
 
 
-def _fetch_billing_context(connection) -> str | None:
-    row = connection.execute(
-        """
-        SELECT current_balance, projected_bill, budget_limit, current_grid_data_usage, solar_energy_usage
-        FROM billing_summary
-        WHERE id = 1
-        """
-    ).fetchone()
-    if not row:
+async def _fetch_billing_context() -> str | None:
+    db = get_firestore_client()
+    doc = await db.collection("billing_summary").document("1").get()
+    if not doc.exists:
         return None
-
-    billing = dict(row)
-    grid_usage = float(billing["current_grid_data_usage"])
-    projected_bill = float(billing["projected_bill"])
-    solar_usage = float(billing["solar_energy_usage"])
+    billing = doc.to_dict()
+    grid_usage = float(billing.get("current_grid_data_usage", 0))
+    projected_bill = float(billing.get("projected_bill", 0))
+    solar_usage = float(billing.get("solar_energy_usage", 0))
     unit_rate = projected_bill / grid_usage if grid_usage else 0
     solar_savings = solar_usage * unit_rate
     payable_bill = max(projected_bill - solar_savings, 0)
 
     return (
-        f"Current generated bill is Rs.{billing['current_balance']:.0f}, "
+        f"Current generated bill is Rs.{billing.get('current_balance', 0):.0f}, "
         f"projected grid bill is Rs.{projected_bill:.0f}, "
-        f"budget limit is Rs.{billing['budget_limit']:.0f}, "
+        f"budget limit is Rs.{billing.get('budget_limit', 0):.0f}, "
         f"grid usage is {grid_usage:.0f} kWh, "
         f"solar usage is {solar_usage:.0f} kWh, "
         f"estimated solar savings are Rs.{solar_savings:.0f}, "
@@ -39,24 +32,25 @@ def _fetch_billing_context(connection) -> str | None:
     )
 
 
-def _fetch_invoice_history_context(connection) -> str | None:
-    rows = connection.execute(
-        """
-        SELECT month, amount, status, invoice_number
-        FROM invoice_history
-        ORDER BY id DESC
-        LIMIT 6
-        """
-    ).fetchall()
-    if not rows:
+async def _fetch_invoice_history_context() -> str | None:
+    db = get_firestore_client()
+    docs = await db.collection("invoice_history").get()
+    if not docs:
         return None
+    
+    rows = [doc.to_dict() for doc in docs]
+    # Simple manual sort for mock data to simulate ID descending
+    rows.reverse()
+    rows = rows[:6]
 
-    amounts = [float(row["amount"]) for row in rows]
+    amounts = [float(row.get("amount", 0)) for row in rows]
+    if not amounts:
+        return None
     average_amount = sum(amounts) / len(amounts)
     latest_amount = amounts[0]
     estimated_next_bill = round((latest_amount + average_amount) / 2)
     invoice_text = "; ".join(
-        f"{row['month']} {row['invoice_number']} was Rs.{float(row['amount']):.0f} and {row['status']}"
+        f"{row.get('month', '')} {row.get('invoice_number', '')} was Rs.{float(row.get('amount', 0)):.0f} and {row.get('status', '')}"
         for row in rows
     )
     return (
@@ -66,46 +60,36 @@ def _fetch_invoice_history_context(connection) -> str | None:
     )
 
 
-
-def _fetch_live_context(connection) -> str | None:
-    row = connection.execute(
-        """
-        SELECT grid_draw_kw, solar_generation_kw, net_usage_kw
-        FROM dashboard_live
-        WHERE id = 1
-        """
-    ).fetchone()
-    if not row:
+async def _fetch_live_context() -> str | None:
+    db = get_firestore_client()
+    doc = await db.collection("dashboard_live").document("1").get()
+    if not doc.exists:
         return None
-
-    live = dict(row)
+    live = doc.to_dict()
     return (
-        f"Grid draw is {live['grid_draw_kw']:.1f} kW, "
-        f"solar generation is {live['solar_generation_kw']:.1f} kW, "
-        f"net usage is {live['net_usage_kw']:.1f} kW."
+        f"Grid draw is {live.get('grid_draw_kw', 0):.1f} kW, "
+        f"solar generation is {live.get('solar_generation_kw', 0):.1f} kW, "
+        f"net usage is {live.get('net_usage_kw', 0):.1f} kW."
     )
 
 
-def _fetch_device_context(connection) -> str | None:
-    rows = connection.execute(
-        """
-        SELECT name, location, status, power_usage_w
-        FROM devices
-        ORDER BY power_usage_w DESC, name
-        LIMIT 5
-        """
-    ).fetchall()
-    if not rows:
+async def _fetch_device_context() -> str | None:
+    db = get_firestore_client()
+    docs = await db.collection("devices").get()
+    if not docs:
         return None
-
+    rows = [doc.to_dict() for doc in docs]
+    rows.sort(key=lambda x: x.get("power_usage_w", 0), reverse=True)
+    rows = rows[:5]
+    
     devices = [
-        f"{row['name']} in {row['location']} is {row['status']} at {row['power_usage_w']} W"
+        f"{row.get('name', '')} in {row.get('location', '')} is {row.get('status', '')} at {row.get('power_usage_w', 0)} W"
         for row in rows
     ]
     return "; ".join(devices) + "."
 
 
-def _get_sql_context(query: str = "") -> list[str]:
+async def _get_sql_context(query: str = "") -> list[str]:
     """Fetch relevant SQL contexts based on keywords to save LLM tokens and lower latency."""
     q = query.lower()
     
@@ -114,27 +98,29 @@ def _get_sql_context(query: str = "") -> list[str]:
     needs_live = any(w in q for w in ["live", "now", "current", "dashboard", "generating", "drawing", "net", "today"])
     needs_devices = any(w in q for w in ["device", "appliance", "ac", "fan", "power", "watt", "status"])
     
-    # If no keywords matched, fallback to bringing everything just in case.
     if not any([needs_billing, needs_history, needs_live, needs_devices]):
         needs_billing = needs_history = needs_live = needs_devices = True
         
     context = []
-    with get_connection() as connection:
-        if needs_billing:
-            context.append(_fetch_billing_context(connection))
-        if needs_history:
-            context.append(_fetch_invoice_history_context(connection))
-        if needs_live:
-            context.append(_fetch_live_context(connection))
-        if needs_devices:
-            context.append(_fetch_device_context(connection))
+    if needs_billing:
+        res = await _fetch_billing_context()
+        if res: context.append(res)
+    if needs_history:
+        res = await _fetch_invoice_history_context()
+        if res: context.append(res)
+    if needs_live:
+        res = await _fetch_live_context()
+        if res: context.append(res)
+    if needs_devices:
+        res = await _fetch_device_context()
+        if res: context.append(res)
             
-    return [item for item in context if item]
+    return context
 
 
-def answer_qa(request: ChatRequest) -> ChatResponse:
+async def answer_qa(request: ChatRequest) -> ChatResponse:
     guide_chunks = retrieve_chroma_chunks(request.question, GUIDE_CHUNK_LIMIT)
-    sql_chunks = _get_sql_context(request.question)
+    sql_chunks = await _get_sql_context(request.question)
     
     context_chunks = guide_chunks + sql_chunks
     

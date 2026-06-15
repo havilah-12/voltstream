@@ -4,5 +4,5 @@ from services.dashboard_service import get_live_dashboard as get_live_dashboard_
 router = APIRouter()
 
 @router.get("/live")
-def get_live_dashboard():
-    return get_live_dashboard_data()
+async def get_live_dashboard():
+    return await get_live_dashboard_data()

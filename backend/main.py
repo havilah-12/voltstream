@@ -2,6 +2,7 @@ import os
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from database.db import initialize_database
@@ -22,7 +23,12 @@ logger = logging.getLogger("voltstream")
 
 @asynccontextmanager
 async def lifespan(api: FastAPI):
-    initialize_database()
+    try:
+        logger.info("Initializing database...")
+        await asyncio.wait_for(initialize_database(), timeout=15.0)
+        logger.info("Database initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to initialize database during startup: {e}")
     yield
 
 

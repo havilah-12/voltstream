@@ -1,187 +1,78 @@
-import sqlite3
-from pathlib import Path
-
+import logging
+from google.cloud import firestore
 from database.mock_data import mock_db
 
-BACKEND_DIR = Path(__file__).resolve().parent
-DB_PATH = BACKEND_DIR / "voltstream.sqlite3"
+logger = logging.getLogger("voltstream")
 
+def get_firestore_client() -> firestore.AsyncClient:
+    return firestore.AsyncClient(project="voltstreamapp", database="voltstream")
 
-def get_connection() -> sqlite3.Connection:
-    connection = sqlite3.connect(DB_PATH, check_same_thread=False)
-    connection.row_factory = sqlite3.Row
-    return connection
+async def initialize_database() -> None:
+    await seed_database_if_empty()
 
+async def seed_database_if_empty() -> None:
+    db = get_firestore_client()
 
-def initialize_database() -> None:
-    with get_connection() as connection:
-        cursor = connection.cursor()
-        cursor.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS dashboard_live (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                grid_draw_kw REAL NOT NULL,
-                solar_generation_kw REAL NOT NULL,
-                net_usage_kw REAL NOT NULL
-            );
+    # 1. Dashboard
+    dash_ref = db.collection("dashboard_live").document("1")
+    if not (await dash_ref.get()).exists:
+        logger.info("Seeding dashboard_live...")
+        await dash_ref.set(mock_db["dashboard_live"])
 
-            CREATE TABLE IF NOT EXISTS analytics_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                period TEXT NOT NULL,
-                label TEXT NOT NULL,
-                grid REAL NOT NULL,
-                solar REAL NOT NULL
-            );
+    # 2. Analytics History
+    history_coll = db.collection("analytics_history")
+    if len(await history_coll.limit(1).get()) == 0:
+        logger.info("Seeding analytics_history...")
+        for period, entries in mock_db["analytics_history"].items():
+            for entry in entries:
+                await history_coll.add({
+                    "period": period,
+                    "label": entry["label"],
+                    "grid": entry["grid"],
+                    "solar": entry["solar"]
+                })
 
-            CREATE TABLE IF NOT EXISTS device_analytics_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                device_name TEXT NOT NULL,
-                period TEXT NOT NULL,
-                label TEXT NOT NULL,
-                consumption_kwh REAL NOT NULL
-            );
+    # 3. Device Analytics History
+    device_history_coll = db.collection("device_analytics_history")
+    if "device_analytics_history" in mock_db and len(await device_history_coll.limit(1).get()) == 0:
+        logger.info("Seeding device_analytics_history...")
+        for period, entries in mock_db["device_analytics_history"].items():
+            for entry in entries:
+                await device_history_coll.add({
+                    "device_name": entry["device_name"],
+                    "period": period,
+                    "label": entry["label"],
+                    "consumption_kwh": entry["consumption_kwh"]
+                })
 
-            CREATE TABLE IF NOT EXISTS devices (
-                id TEXT PRIMARY KEY,
-                type TEXT NOT NULL,
-                name TEXT NOT NULL,
-                location TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'OFF',
-                power_usage_w INTEGER NOT NULL DEFAULT 0
-            );
+    # 4. Devices
+    devices_coll = db.collection("devices")
+    if len(await devices_coll.limit(1).get()) == 0:
+        logger.info("Seeding devices...")
+        for device in mock_db["devices"]:
+            await devices_coll.document(device["id"]).set({
+                "id": device["id"],
+                "type": device["type"],
+                "name": device["name"],
+                "location": device.get("location", ""),
+                "status": device.get("status", "OFF"),
+                "power_usage_w": device.get("power_usage_w", 0)
+            })
 
-            CREATE TABLE IF NOT EXISTS billing_summary (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                current_balance REAL NOT NULL,
-                projected_bill REAL NOT NULL,
-                budget_limit REAL NOT NULL,
-                current_grid_data_usage REAL NOT NULL,
-                solar_energy_usage REAL NOT NULL
-            );
+    # 5. Billing
+    billing_ref = db.collection("billing_summary").document("1")
+    if not (await billing_ref.get()).exists:
+        logger.info("Seeding billing_summary...")
+        await billing_ref.set(mock_db["billing"])
 
-            CREATE TABLE IF NOT EXISTS invoice_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                month TEXT NOT NULL,
-                amount REAL NOT NULL,
-                status TEXT NOT NULL,
-                invoice_number TEXT NOT NULL
-            );
-            """
-        )
-        connection.commit()
-
-    seed_database_if_empty()
-
-
-def seed_database_if_empty() -> None:
-    with get_connection() as connection:
-        cursor = connection.cursor()
-        has_dashboard = cursor.execute("SELECT 1 FROM dashboard_live WHERE id = 1").fetchone()
-        has_history = cursor.execute("SELECT 1 FROM analytics_history LIMIT 1").fetchone()
-        has_device_history = cursor.execute("SELECT 1 FROM device_analytics_history LIMIT 1").fetchone()
-        has_devices = cursor.execute("SELECT 1 FROM devices LIMIT 1").fetchone()
-        has_billing = cursor.execute("SELECT 1 FROM billing_summary WHERE id = 1").fetchone()
-        has_invoices = cursor.execute("SELECT 1 FROM invoice_history LIMIT 1").fetchone()
-
-        if not has_dashboard:
-            dashboard = mock_db["dashboard_live"]
-            cursor.execute(
-                """
-                INSERT INTO dashboard_live (id, grid_draw_kw, solar_generation_kw, net_usage_kw)
-                VALUES (1, ?, ?, ?)
-                """,
-                (
-                    dashboard["grid_draw_kw"],
-                    dashboard["solar_generation_kw"],
-                    dashboard["net_usage_kw"],
-                ),
-            )
-
-        if not has_history:
-            rows = []
-            for period, entries in mock_db["analytics_history"].items():
-                for entry in entries:
-                    rows.append((period, entry["label"], entry["grid"], entry["solar"]))
-            cursor.executemany(
-                """
-                INSERT INTO analytics_history (period, label, grid, solar)
-                VALUES (?, ?, ?, ?)
-                """,
-                rows,
-            )
-
-        if not has_device_history and "device_analytics_history" in mock_db:
-            device_rows = []
-            for period, entries in mock_db["device_analytics_history"].items():
-                for entry in entries:
-                    device_rows.append((entry["device_name"], period, entry["label"], entry["consumption_kwh"]))
-            cursor.executemany(
-                """
-                INSERT INTO device_analytics_history (device_name, period, label, consumption_kwh)
-                VALUES (?, ?, ?, ?)
-                """,
-                device_rows,
-            )
-
-        if not has_devices:
-            rows = [
-                (
-                    device["id"],
-                    device["type"],
-                    device["name"],
-                    device.get("location", ""),
-                    device.get("status", "OFF"),
-                    device.get("power_usage_w", 0),
-                )
-                for device in mock_db["devices"]
-            ]
-            cursor.executemany(
-                """
-                INSERT INTO devices (id, type, name, location, status, power_usage_w)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                rows,
-            )
-
-        if not has_billing:
-            billing = mock_db["billing"]
-            cursor.execute(
-                """
-                INSERT INTO billing_summary (
-                    id,
-                    current_balance,
-                    projected_bill,
-                    budget_limit,
-                    current_grid_data_usage,
-                    solar_energy_usage
-                )
-                VALUES (1, ?, ?, ?, ?, ?)
-                """,
-                (
-                    billing["current_balance"],
-                    billing["projected_bill"],
-                    billing["budget_limit"],
-                    billing["current_grid_data_usage"],
-                    billing["solar_energy_usage"],
-                ),
-            )
-
-        if not has_invoices:
-            rows = [
-                (
-                    invoice["month"],
-                    invoice["amount"],
-                    invoice["status"],
-                    invoice["invoice_number"],
-                )
-                for invoice in mock_db["invoice_history"]
-            ]
-            cursor.executemany(
-                """
-                INSERT INTO invoice_history (month, amount, status, invoice_number)
-                VALUES (?, ?, ?, ?)
-                """,
-                rows,
-            )
-
-        connection.commit()
+    # 6. Invoices
+    invoices_coll = db.collection("invoice_history")
+    if len(await invoices_coll.limit(1).get()) == 0:
+        logger.info("Seeding invoice_history...")
+        for invoice in mock_db["invoice_history"]:
+            await invoices_coll.add({
+                "month": invoice["month"],
+                "amount": invoice["amount"],
+                "status": invoice["status"],
+                "invoice_number": invoice["invoice_number"]
+            })

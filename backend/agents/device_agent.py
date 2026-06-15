@@ -2,6 +2,7 @@ import json  # Formats SSE data for frontend.
 import logging  # Debug and error logging.
 import os  # Environment variables (API keys, timezone).
 import threading  # Non-blocking background worker for schedules.
+import asyncio
 from datetime import datetime  # Time math for scheduling.
 from uuid import uuid4  # Unique IDs for sessions and jobs.
 from zoneinfo import ZoneInfo  # Local timezone support.
@@ -21,18 +22,17 @@ from utils.decorators import tool_annotation
 logger = logging.getLogger(__name__)
 
 
-# Saves Gemini tokens by acting as a local search engine so the AI doesn't need to fetch the entire database via list_all_devices()
-def _find(query: str) -> dict | None:
+async def _find(query: str) -> dict | None:
     q = query.lower().strip()
+    devices = await device_service.list_devices()
     return next(
-        (d for d in device_service.list_devices()
+        (d for d in devices
          if q in (d["id"].lower(), d["name"].lower(), d["type"].lower())
          or q in d["name"].lower() or q in d["type"].lower()),
         None,
     )
 
 
-# Tool: Acts as the AI's database lookup to fetch the exact device ID and its current ON/OFF status.
 @tool_annotation(
     name="get_device_status",
     agent="voltstream_device_agent",
@@ -41,20 +41,14 @@ def _find(query: str) -> dict | None:
     parameters={"device_id": "Device id, name, or type — e.g. 'AC', 'Air Conditioning', 'fan'."},
     returns="Dictionary containing status, exact device_id, name, and current_status.",
 )
-def get_device_status(device_id: str) -> dict:
-    """Get the current status of a VoltStream device.
-
-    Args:
-        device_id: Device id, name, or type — e.g. 'AC', 'Air Conditioning', 'fan'.
-    """
-    d = _find(device_id)
+async def get_device_status(device_id: str) -> dict:
+    """Get the current status of a VoltStream device."""
+    d = await _find(device_id)
     if not d:
         return {"status": "error", "message": f"No device matched '{device_id}'."}
     return {"status": "success", "device_id": d["id"], "name": d["name"], "current_status": d["status"]}
 
 
-
-# Tool: Instantly updates the database to turn a device ON or OFF.
 @tool_annotation(
     name="toggle_device",
     agent="voltstream_device_agent",
@@ -66,26 +60,21 @@ def get_device_status(device_id: str) -> dict:
     },
     returns="Dictionary containing the result of the toggle operation.",
 )
-def toggle_device(device_id: str, state: str) -> dict:
-    """Turn a VoltStream device ON or OFF immediately.
-
-    Args:
-        device_id: Exact device id from get_device_status — e.g. 'ac-1'.
-        state: 'ON' or 'OFF'.
-    """
+async def toggle_device(device_id: str, state: str) -> dict:
+    """Turn a VoltStream device ON or OFF immediately."""
     if state not in {"ON", "OFF"}:
         return {"status": "error", "message": "State must be 'ON' or 'OFF'."}
-    d = _find(device_id)
+    d = await _find(device_id)
     if not d:
         return {"status": "error", "message": f"No device found: '{device_id}'."}
     if d["status"] == state:
         return {"status": "success", "device_id": d["id"], "name": d["name"], "updated_status": state, "message": f"{d['name']} is already {state}."}
-    updated = device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state))
+    updated = await device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state))
     if not updated:
         return {"status": "error", "message": f"Failed to update {d['name']}."}
     return {"status": "success", "device_id": updated["id"], "name": updated["name"], "updated_status": updated["status"], "message": f"{updated['name']} turned {updated['status']}."}
 
-# Tool: Turns all VoltStream devices ON or OFF
+
 @tool_annotation(
     name="toggle_all_devices",
     agent="voltstream_device_agent",
@@ -94,20 +83,16 @@ def toggle_device(device_id: str, state: str) -> dict:
     parameters={"state": "'ON' or 'OFF'."},
     returns="Dictionary containing the result and number of devices updated.",
 )
-def toggle_all_devices(state: str) -> dict:
-    """Turn ALL VoltStream devices ON or OFF.
-    
-    Args:
-        state: 'ON' or 'OFF'.
-    """
+async def toggle_all_devices(state: str) -> dict:
+    """Turn ALL VoltStream devices ON or OFF."""
     if state not in {"ON", "OFF"}:
         return {"status": "error", "message": "State must be 'ON' or 'OFF'."}
     
-    devices = device_service.list_devices()
+    devices = await device_service.list_devices()
     updated_count = 0
     for d in devices:
         if d["status"] != state:
-            device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state))
+            await device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state))
             updated_count += 1
             
     return {
@@ -118,12 +103,11 @@ def toggle_all_devices(state: str) -> dict:
 _SCHEDULED_TIMERS: dict[str, threading.Timer] = {}
 _TZ = ZoneInfo(os.getenv("TZ", "Asia/Kolkata"))
 
-# Internal: Uses a Python background thread to wait silently and update the device at a specific future time.
-def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: str) -> dict:
+async def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: str) -> dict:
     """Internal scheduling logic. Do not expose this directly to the LLM."""
     if state not in {"ON", "OFF"}:
         return {"status": "error", "message": "State must be 'ON' or 'OFF'."}
-    d = _find(device_id)
+    d = await _find(device_id)
     if not d:
         return {"status": "error", "message": f"No device found: '{device_id}'."}
     try:
@@ -138,7 +122,7 @@ def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: st
 
     def _run():
         try:
-            device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state))
+            asyncio.run(device_service.update_device_status(d["id"], DeviceStatusUpdate(status=state)))
             logger.info("Scheduled toggle done: %s → %s", d["id"], state)
         except Exception as exc:
             logger.exception("Scheduled toggle failed for %s: %s", d["id"], exc)
@@ -160,7 +144,6 @@ def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: st
         "message": f"{d['name']} will turn {state} at {scheduled_at.strftime('%I:%M %p on %Y-%m-%d')}.",
     }
 
-# Tool: Validates the dev certificate and then schedules the device toggle.
 @tool_annotation(
     name="schedule_device",
     agent="voltstream_device_agent",
@@ -174,21 +157,13 @@ def _schedule_device_internal(device_id: str, state: str, scheduled_time_iso: st
     },
     returns="Dictionary containing the scheduled job details.",
 )
-def schedule_device(device_id: str, state: str, scheduled_time_iso: str, cert: str) -> dict:
-    """Schedule a VoltStream device to turn ON or OFF at a future time using a valid certificate.
-
-    Args:
-        device_id: Exact device id from get_device_status — e.g. 'ac-1'.
-        state: 'ON' or 'OFF'.
-        scheduled_time_iso: Future datetime in ISO 8601 format e.g. 2025-05-21T22:00:00.
-        cert: Base64-encoded client certificate or token that authorizes this specific action.
-    """
+async def schedule_device(device_id: str, state: str, scheduled_time_iso: str, cert: str) -> dict:
     try:
         verify_token(cert, device_id, state, scheduled_time_iso)
     except PermissionError as e:
         return {"status": "error", "message": f"Certificate verification failed: {e}"}
         
-    return _schedule_device_internal(device_id, state, scheduled_time_iso)
+    return await _schedule_device_internal(device_id, state, scheduled_time_iso)
 
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
@@ -207,13 +182,11 @@ _agent = Agent(
 _sessions = InMemorySessionService()
 _runner = Runner(agent=_agent, app_name="voltstream", session_service=_sessions)
 
-
 # ── SSE stream ────────────────────────────────────────────────────────────────
 
 def _sse(event_type: str, data: dict) -> str:
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
-# Streamer: The main engine that bridges Python and Gemini, executing tools and sending real-time updates back to the router.
 async def stream_device_agent(message: str):
     start_time = time.time()
     session_id = f"session-{uuid4().hex}"
@@ -222,15 +195,7 @@ async def stream_device_agent(message: str):
 
     try:
         now_iso = datetime.now(_TZ).isoformat()
-
-        # We removed the regex fast path entirely.
-        # Now we parse a potential schedule token passed from the frontend, or just prompt.
         
-        # In a real app, the token would be sent in headers or a separate field.
-        # For simplicity, if the frontend sends a structured JSON with "message" and "token", we can extract it.
-        # If it's a simple string, we will assume the token is embedded or we fall back.
-        
-        # First try parsing message as JSON to see if token is there.
         client_cert = "none"
         user_text = message
         try:
@@ -242,7 +207,7 @@ async def stream_device_agent(message: str):
             pass
             
         from services.device_service import list_devices
-        devices = list_devices()
+        devices = await list_devices()
         devices_list_str = ", ".join([f"{d['name']} (id: {d['id']}, status: {d['status']})" for d in devices])
         
         prompt_with_time = DEVICE_AGENT_USER_CONTEXT_TEMPLATE.format(

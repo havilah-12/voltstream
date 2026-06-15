@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
     returns="JSON string containing historical energy usage data.",
 )
 @tracer.start_as_current_span("fetch_usage_history")
-def fetch_usage_history(period: str) -> str:
+async def fetch_usage_history(period: str) -> str:
     """Fetch usage history (grid and solar data) for a given period."""
     if period not in {"daily", "weekly", "monthly"}:
         period = "weekly"
-    data = get_history(period)
+    data = await get_history(period)
     return json.dumps(data)
 
 
@@ -49,12 +49,14 @@ def fetch_usage_history(period: str) -> str:
     returns="JSON string containing list of active devices and their power usage.",
 )
 @tracer.start_as_current_span("fetch_device_power_usage")
-def fetch_device_power_usage() -> str:
+async def fetch_device_power_usage() -> str:
     """Fetch the real-time power usage (in Watts) of all devices currently active in the home."""
-    from database.db import get_connection
-    with get_connection() as conn:
-        rows = conn.execute("SELECT name, location, status, power_usage_w FROM devices ORDER BY power_usage_w DESC").fetchall()
-    return json.dumps([dict(r) for r in rows])
+    from database.db import get_firestore_client
+    db = get_firestore_client()
+    docs = await db.collection("devices").get()
+    rows = [doc.to_dict() for doc in docs]
+    rows.sort(key=lambda x: x.get("power_usage_w", 0), reverse=True)
+    return json.dumps(rows)
 
 
 @tool_annotation(
@@ -66,27 +68,20 @@ def fetch_device_power_usage() -> str:
     returns="JSON string containing historical device consumption data.",
 )
 @tracer.start_as_current_span("fetch_device_historical_usage")
-def fetch_device_historical_usage(period: str) -> str:
+async def fetch_device_historical_usage(period: str) -> str:
     """Fetch historical energy consumption (in kWh) for individual devices over a given period."""
     if period not in {"daily", "weekly", "monthly"}:
         period = "weekly"
     
-    from database.db import get_connection
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT device_name, label, consumption_kwh
-            FROM device_analytics_history
-            WHERE period = ?
-            ORDER BY id
-            """,
-            (period,)
-        ).fetchall()
-        
+    from database.db import get_firestore_client
+    db = get_firestore_client()
+    docs = await db.collection("device_analytics_history").where("period", "==", period).get()
+    rows = [doc.to_dict() for doc in docs]
+    
     if not rows:
         return "No historical data found for individual devices."
         
-    return json.dumps([dict(r) for r in rows])
+    return json.dumps(rows)
 
 
 settings = get_settings()

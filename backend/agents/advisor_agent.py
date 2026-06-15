@@ -67,19 +67,20 @@ async def call_advisor_agent(query: str) -> str:
                 
             client = genai.Client(http_options={'timeout': 10000})
                 
-            def _fetch_db_usage():
+            async def _fetch_db_usage_async():
                 try:
-                    from database.db import get_connection
+                    from database.db import get_firestore_client
                     from services.analytics_service import get_history
-                    history = get_history("weekly")
-                    with get_connection() as conn:
-                        devices = conn.execute("SELECT name, power_usage_w FROM devices WHERE status='ON'").fetchall()
-                    dev_str = ", ".join([f"{d['name']} ({d['power_usage_w']}W)" for d in devices])
+                    history = await get_history("weekly")
+                    db = get_firestore_client()
+                    docs = await db.collection("devices").where("status", "==", "ON").get()
+                    devices = [d.to_dict() for d in docs]
+                    dev_str = ", ".join([f"{d.get('name', '')} ({d.get('power_usage_w', 0)}W)" for d in devices])
                     return f"Weekly History: {json.dumps(history)}. Active Devices: {dev_str}"
-                except Exception:
+                except Exception as e:
                     return ""
 
-            usage_context = await asyncio.to_thread(_fetch_db_usage)
+            usage_context = await _fetch_db_usage_async()
             
             prompt_text = ""
             if usage_context:

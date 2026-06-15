@@ -6,8 +6,8 @@ from services.gemini_service import ask_gemini
 router = APIRouter()
 
 @router.get("/history")
-def get_analytics_history(period: str | None = Query("daily", description="daily, weekly, or monthly")):
-    return get_history(period)
+async def get_analytics_history(period: str | None = Query("daily", description="daily, weekly, or monthly")):
+    return await get_history(period)
 
 @router.post("/summary", response_model=ChatResponse)
 def get_analytics_summary(request: ChatRequest = Body(...)):

@@ -11,3 +11,5 @@ opentelemetry-instrumentation-fastapi==0.58b0
 streamlit==1.40.1
 python-multipart==0.0.20
 pypdf==5.5.0
+
+google-cloud-firestore
