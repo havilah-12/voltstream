@@ -5,7 +5,6 @@ import os
 from uuid import uuid4
 
 from config import get_settings
-from google import genai
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -65,8 +64,6 @@ async def call_advisor_agent(query: str) -> str:
             if attempt > 0:
                 await asyncio.sleep(2)
                 
-            client = genai.Client(http_options={'timeout': 10000})
-                
             async def _fetch_db_usage_async():
                 try:
                     from database.db import get_firestore_client
@@ -77,7 +74,7 @@ async def call_advisor_agent(query: str) -> str:
                     devices = [d.to_dict() for d in docs]
                     dev_str = ", ".join([f"{d.get('name', '')} ({d.get('power_usage_w', 0)}W)" for d in devices])
                     return f"Weekly History: {json.dumps(history)}. Active Devices: {dev_str}"
-                except Exception as e:
+                except Exception:
                     return ""
 
             usage_context = await _fetch_db_usage_async()

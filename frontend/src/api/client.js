@@ -59,7 +59,7 @@ export async function apiRequest(path, options = {}) {
     try {
       const response = await axios({
         url: `${baseUrl}${path}`,
-        timeout: options.timeout ?? (preferredBaseUrl === baseUrl ? 12000 : 8000),
+        timeout: options.timeout ?? 30000,
         ...options,
       });
 
