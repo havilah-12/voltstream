@@ -32,11 +32,26 @@ User Input: "Show my usage and tell me how to save energy."
 [Orchestrator Agent] ──► (Vertex AI) Analyzes intent
    │
    ├──► Routes to [Analyst Agent] ──► Uses Firestore Tools to fetch Usage History
-   ├──► Routes to [Device Agent] ──► Uses Tools to control Smart Devices
    └──► Routes to [Advisor Agent] ──► Uses Advanced RAG for solar/energy advice
 ```
 
-### 2. 🧠 Advanced RAG & LLM-as-a-Judge (Advisor Agent)
+### 2. 🏠 The Device Agent Flow (Standalone)
+For ultra-fast, low-latency smart home control, the Device Agent operates independently.
+
+```text
+User Input: "Turn off the AC in 5 minutes."
+   │
+   ▼
+[FastAPI Router] ──► /api/v1/device_agent/chat
+   │
+   ▼
+[Device Agent] ──► (Vertex AI) Determines schedule and toggle state
+   │
+   ▼
+[Tools] ──► Uses `schedule_device` tool to queue the command
+```
+
+### 3. 🧠 Advanced RAG & LLM-as-a-Judge (Advisor Agent)
 The Retrieval-Augmented Generation (RAG) system powers grounded Q&A with strict hallucination checks.
 
 ```text
@@ -58,7 +73,7 @@ User Question: "What is a solar surplus?"
 [Frontend SSE] ◄── Streams final verified answer + source citations to UI
 ```
 
-### 3. 📡 OpenTelemetry Tracing
+### 4. 📡 OpenTelemetry Tracing
 Every action inside the backend is tracked by OpenTelemetry and visualized in Jaeger.
 
 ```text
