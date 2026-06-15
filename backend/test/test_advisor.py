@@ -1,6 +1,9 @@
 import asyncio
-from backend.agents.advisor_agent import call_advisor_agent
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from agents.advisor_agent import call_advisor_agent
 
 async def main():
     try:

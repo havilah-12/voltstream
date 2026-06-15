@@ -1,4 +1,4 @@
-import asyncio
+
 from schemas.chat import ChatRequest
 from services.chat_service import answer_chat
 

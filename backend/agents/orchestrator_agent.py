@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from uuid import uuid4
-import re
+
 
 from config import get_settings
 from google.adk.agents import Agent
@@ -62,13 +62,24 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
             session_id=session_id,
             new_message=Content(role="user", parts=[Part(text=message)]),
         ):
+            # ---- SPY LOOP 1: Function Calls ----
+            # The LLM has already decided to call a tool completely independently.
+            # This loop just "spies" on that decision as it flies by so we can print it to the terminal
+            # and push a Server-Sent Event (SSE) to the frontend UI.
             for call in event.get_function_calls():
                 yield _sse("tool_call", {"name": call.name, "args": call.args})
                 if call.name == "call_advisor_agent":
                     advisor_query = call.args.get("query", "")
                     logger.info(f"[AGENT TRACE] Orchestrator routing query to Advisor Agent: '{advisor_query}'")
+            
+            # ---- SPY LOOP 2: Function Responses ----
+            # The sub-agent has finished its job and returned a response back to the Orchestrator.
+            # Again, this loop just spies on that returned data.
             for resp in event.get_function_responses():
                 yield _sse("tool_response", {"name": resp.name})
+                
+                # If the response came specifically from the Advisor Agent, we do some extra logic
+                # to extract the text and trigger the background LLM-as-a-Judge evaluation.
                 if resp.name == "call_advisor_agent":
                     if isinstance(resp.response, dict) and "result" in resp.response:
                         resp_str = str(resp.response["result"])
