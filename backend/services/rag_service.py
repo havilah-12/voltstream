@@ -130,10 +130,10 @@ async def answer_qa(request: ChatRequest) -> ChatResponse:
     context_chunks = guide_chunks + sql_chunks
     
     if not context_chunks:
-        logger.info(f"[AGENT TRACE] Basic RAG found no context. Returning out-of-scope.")
+        logger.info("[AGENT TRACE] Basic RAG found no context. Returning out-of-scope.")
         return ChatResponse(answer=OUT_OF_SCOPE_ANSWER, sources=[], used_gemini=False)
 
-    logger.info(f"[AGENT TRACE] Basic RAG invoking Gemini with combined context...")
+    logger.info("[AGENT TRACE] Basic RAG invoking Gemini with combined context...")
     answer = ask_gemini(
         request.question,
         context_chunks,
@@ -141,8 +141,8 @@ async def answer_qa(request: ChatRequest) -> ChatResponse:
         out_of_scope_answer=OUT_OF_SCOPE_ANSWER,
     )
     if not answer:
-        logger.info(f"[AGENT TRACE] Gemini returned empty answer.")
+        logger.info("[AGENT TRACE] Gemini returned empty answer.")
         return ChatResponse(answer=OUT_OF_SCOPE_ANSWER, sources=context_chunks, used_gemini=False)
 
-    logger.info(f"[AGENT TRACE] Gemini returned successfully generated answer.")
+    logger.info("[AGENT TRACE] Gemini returned successfully generated answer.")
     return ChatResponse(answer=answer, sources=context_chunks, used_gemini=True)
