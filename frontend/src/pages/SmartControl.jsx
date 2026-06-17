@@ -8,7 +8,6 @@ import PageHeader from "../components/PageHeader";
 import { useNotifications } from "../features/notifications/notificationStore";
 import {
   Bot,
-  CalendarClock,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -18,9 +17,7 @@ import {
   Power,
   Send,
   Trash2,
-  X,
   Zap,
-  Loader2,
   XCircle,
 } from "lucide-react";
 
@@ -41,22 +38,10 @@ import {
   getSavingStatus,
   getTypeConfig,
   normalizeType,
-  normalizeTypeKey,
   withHouseholdDefaults,
-  getMentionedDeviceType,
-  messageSpecifiesDevice,
 } from "../features/devices/deviceUtils";
 
-import {
-  canScheduleAgentMessage,
-  getAgentAction,
-  getAgentResult,
-  getRequestedScheduleTimeText,
-  getTimingPhrase,
-  isAddDeviceRequest,
-  normalizeScheduleTimeInput,
-  parseScheduledFor,
-} from "../features/devices/agentUtils";
+import { getAgentResult, parseScheduledFor } from "../features/devices/agentUtils";
 
 export default function SmartControl() {
   const [devices, setDevices] = useState([]);
@@ -72,19 +57,10 @@ export default function SmartControl() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [agentOpen, setAgentOpen] = useState(false);
   const [agentMessage, setAgentMessage] = useState("");
   const [agentEvents, setAgentEvents] = useState([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState("");
-  const [agentChoice, setAgentChoice] = useState(null);
-  const [agentIntent, setAgentIntent] = useState("");
-  const [agentTargetName, setAgentTargetName] = useState("device");
-  const [agentTargetType, setAgentTargetType] = useState("");
-  const [hideScheduleLoadingPanel, setHideScheduleLoadingPanel] = useState(false);
-  const [scheduleComposerOpen, setScheduleComposerOpen] = useState(false);
-  const [scheduleTime, setScheduleTime] = useState("");
-  const [agentSubmittedMessage, setAgentSubmittedMessage] = useState("");
   const agentRunIdRef = useRef(0);
   const dismissedAgentRunIdRef = useRef(0);
   const scheduledTimersRef = useRef([]);
@@ -106,9 +82,8 @@ export default function SmartControl() {
     return () => window.removeEventListener("volt-guided-tour-step", onTourStep);
   }, []);
 
-  const agentResult = getAgentResult(agentEvents, agentIntent, agentTargetName, agentTargetType);
-  const scheduleButtonEnabled = canScheduleAgentMessage(agentMessage);
-  const { notify, markAllRead } = useNotifications();
+  const agentResult = getAgentResult(agentEvents, "", "device");
+  const { notify } = useNotifications();
 
   const loadDevices = () =>
     fetchDevices().then((result) => {
@@ -225,28 +200,21 @@ export default function SmartControl() {
     }
   };
 
-  const executeAgentMessage = async (message, intent = "", options = {}) => {
+  const executeAgentMessage = async (message) => {
     if (!message.trim()) return;
 
-    if (intent === "SCHEDULE") {
-      options.hideLoadingPanel = true;
-    }
-
-    if (!options.hideLoadingPanel) {
-      setAgentEvents([]);
-      setAgentError("");
-      setAgentIntent(intent);
-      setAgentTargetName(options.targetName ?? getMentionedDeviceType(message) ?? "device");
-      setAgentTargetType(options.targetType ?? getMentionedDeviceType(message) ?? "");
-      setAgentLoading(true);
-    }
+    setAgentEvents([]);
+    setAgentError("");
+    setAgentLoading(true);
+    
     const runId = ++agentRunIdRef.current;
-    setAgentSubmittedMessage(message);
-    setHideScheduleLoadingPanel(Boolean(options.hideLoadingPanel));
 
     let localEvents = [];
 
-    const payloadToRun = options.jsonPayload ? options.jsonPayload : message;
+    const payloadToRun = JSON.stringify({
+      message: message,
+      token: "client-placeholder-cert"
+    });
 
     try {
       agentAbortControllerRef.current = new AbortController();
@@ -291,28 +259,17 @@ export default function SmartControl() {
       });
       await loadDevices();
       
-      const result = getAgentResult(localEvents, intent, options.targetName ?? getMentionedDeviceType(message) ?? "device", options.targetType ?? "");
-      console.log("Agent result:", result);
-      console.log("Local events:", localEvents);
+      const result = getAgentResult(localEvents, "", "device");
       
       if (result.isDone && !result.isError) {
         let finalText;
         
         if (result.errorMessage) {
-          // Fix for "already ON/OFF": Extract the relevant message
-          // Usually backend returns something like "AC 2 is already OFF."
-          const match = result.errorMessage.match(/(?:The\s+)?(.*) is already (ON|OFF)\.?/i);
-          if (match) {
-            finalText = `${match[1]} was already ${match[2].toUpperCase()}`;
-          } else {
-            finalText = result.errorMessage;
-          }
+          finalText = result.errorMessage;
         } else {
-          const finalAction = (result.action || intent || "").toUpperCase();
-          finalText = `${result.finalDeviceName} IS TURNED ${finalAction} SUCCESSFULLY.`;
+          finalText = result.answerText || `${result.finalDeviceName || "Device"} command successful.`;
         }
         
-        console.log("Final notification text:", finalText);
         notify({
           type: "success",
           title: "Action Completed",
@@ -322,188 +279,24 @@ export default function SmartControl() {
       }
     } catch (err) {
       setAgentError(err.message || "Unable to run device agent.");
-      // Revert optimistic update on error
       await loadDevices();
     } finally {
       if (dismissedAgentRunIdRef.current === runId) {
         dismissedAgentRunIdRef.current = 0;
       }
-      setAgentLoading(false);
-    }
-  };
-
-  const dispatchAgentMessage = async (trimmedMessage, intent = "", options = {}) => {
-    if (!trimmedMessage) return;
-
-    if (isAddDeviceRequest(trimmedMessage)) {
-      setAgentEvents([]);
-      setAgentChoice(null);
-      setAgentIntent("");
-      setAgentTargetName("device");
-      setAgentSubmittedMessage("");
-      setHideScheduleLoadingPanel(false);
-      setAgentError("Use the Add Device button to add devices. This agent only turns devices on, off, or schedules them.");
-      return;
-    }
-
-    const action = getAgentAction(trimmedMessage);
-    const mentionedType = getMentionedDeviceType(trimmedMessage);
-    const devicesForType = mentionedType
-      ? devices.filter((device) => getDeviceType(device) === mentionedType)
-      : [];
-
-    const timingPhrase = getTimingPhrase(trimmedMessage);
-
-    const isAll = trimmedMessage.toLowerCase().includes("all");
-    if (action && !mentionedType && !isAll) {
-      setAgentEvents([{ event: "answer", data: { answer: `Please tell me which device you would like to turn ${action.toLowerCase()}.` } }]);
-      setAgentChoice(null);
-      setAgentIntent(action);
-      setAgentTargetName("device");
-      setAgentTargetType("");
-      setAgentLoading(false);
-      setAgentMessage("");
-      return;
-    }
-
-    if (!action || !mentionedType) {
-      executeAgentMessage(trimmedMessage, intent, options);
-      return;
-    }
-
-    if (action && mentionedType && devicesForType.length > 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
-      setAgentEvents([]);
-      setAgentError("");
-      setAgentIntent(intent);
-      setAgentTargetName(mentionedType);
-      setHideScheduleLoadingPanel(Boolean(options.hideLoadingPanel));
-      setAgentChoice({
-        action,
-        type: mentionedType,
-        devices: devicesForType,
-        timingText: getTimingPhrase(trimmedMessage),
-      });
-      return;
-    }
-
-    let targetDevice = null;
-    if (devicesForType.length === 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
-      targetDevice = devicesForType[0];
-    } else if (devicesForType.length > 0) {
-      const specifiedDevices = devicesForType.filter((d) => messageSpecifiesDevice(trimmedMessage, [d]));
-      if (specifiedDevices.length === 1) {
-        targetDevice = specifiedDevices[0];
+      if (agentRunIdRef.current === runId) {
+        setAgentLoading(false);
       }
     }
-
-    if (targetDevice && targetDevice.status === action && !timingPhrase) {
-      setAgentTargetName(targetDevice.name);
-      setAgentTargetType(getDeviceType(targetDevice));
-      setAgentError("");
-      setAgentIntent(action);
-      setAgentChoice(null);
-      setHideScheduleLoadingPanel(Boolean(options.hideLoadingPanel));
-      
-      const isAlreadyOn = targetDevice.status === "ON";
-      setAgentEvents([
-        { event: "answer", data: { answer: `${targetDevice.name} is already ${isAlreadyOn ? "ON" : "OFF"}.` } }
-      ]);
-      return;
-    }
-
-    await executeAgentMessage(trimmedMessage, intent, options);
   };
 
   const runAgent = async (event) => {
     event.preventDefault();
-    setScheduleComposerOpen(false);
     const trimmedMessage = agentMessage.trim();
-    
-    const payloadJson = JSON.stringify({
-      message: trimmedMessage,
-      token: "client-placeholder-cert"
-    });
-
-    const isSchedule = !!getTimingPhrase(trimmedMessage);
-
-    await dispatchAgentMessage(trimmedMessage, isSchedule ? "SCHEDULE" : getAgentAction(trimmedMessage), {
-      hideLoadingPanel: false,
-      targetName: getMentionedDeviceType(trimmedMessage) ?? "device",
-      jsonPayload: payloadJson,
-    });
+    await executeAgentMessage(trimmedMessage);
   };
 
-  const scheduleAgent = async () => {
-    const trimmedMessage = agentMessage.trim();
-    if (!trimmedMessage || !scheduleButtonEnabled) return;
 
-    const timingPhrase = getTimingPhrase(trimmedMessage);
-    if (!timingPhrase && !scheduleComposerOpen) {
-      setScheduleComposerOpen(true);
-      setAgentError("");
-      return;
-    }
-
-    const normalizedScheduleTime = normalizeScheduleTimeInput(scheduleTime);
-    if (!timingPhrase && !normalizedScheduleTime) {
-      setAgentError("Add a schedule time, like in 10 secs or at 11:55 AM.");
-      return;
-    }
-
-    const scheduledMessage = timingPhrase ? trimmedMessage : `${trimmedMessage} ${normalizedScheduleTime}`;
-    setScheduleComposerOpen(false);
-    setAgentError("");
-    setScheduleTime("");
-    
-    const payloadJson = JSON.stringify({
-      message: scheduledMessage,
-      token: "client-placeholder-cert"
-    });
-
-    await dispatchAgentMessage(scheduledMessage, "SCHEDULE", {
-      hideLoadingPanel: false,
-      targetName: getMentionedDeviceType(trimmedMessage) ?? "device",
-      jsonPayload: payloadJson,
-    });
-  };
-
-  const runAgentForDevice = (device) => {
-    const actionText = agentChoice?.action === "OFF" ? "Turn off" : "Turn on";
-    const timingText = agentChoice?.timingText ? ` ${agentChoice.timingText}` : "";
-
-    if (device.status?.toUpperCase() === agentChoice?.action) {
-      setAgentEvents([{ event: "answer", data: { answer: `The ${canonicalizeDeviceName(device)} is already ${agentChoice.action}.` } }]);
-      setAgentChoice(null);
-      setAgentIntent(agentChoice.action);
-      setAgentTargetName(canonicalizeDeviceName(device));
-      setAgentTargetType(getDeviceType(device));
-      setAgentLoading(false);
-      return;
-    }
-
-    setAgentChoice(null);
-    executeAgentMessage(`${actionText} ${device.id}${timingText}`, agentIntent, {
-      hideLoadingPanel: false,
-      targetName: canonicalizeDeviceName(device),
-      targetType: getDeviceType(device),
-    });
-  };
-
-  const clearAgentResult = () => {
-    if (!agentLoading) {
-      agentRunIdRef.current++;
-    } else {
-      dismissedAgentRunIdRef.current = agentRunIdRef.current;
-    }
-    setAgentOpen(false);
-    setAgentEvents([]);
-    setAgentError("");
-    setAgentChoice(null);
-    setAgentIntent("");
-    setAgentTargetName("device");
-    setAgentSubmittedMessage("");
-    setHideScheduleLoadingPanel(false);
-  };
 
   const beginAdd = (type = "AC") => {
     const normalizedType = canonicalizeDeviceType(type);
@@ -808,11 +601,6 @@ export default function SmartControl() {
                   value={agentMessage}
                   onChange={(event) => {
                     setAgentMessage(event.target.value);
-                    setAgentChoice(null);
-                    setAgentIntent("");
-                    setAgentTargetName("device");
-                    setAgentSubmittedMessage("");
-                    setHideScheduleLoadingPanel(false);
                     setAgentError("");
                   }}
                   placeholder="Turn off the AC or schedule a device..."
@@ -841,38 +629,7 @@ export default function SmartControl() {
                     Go
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={scheduleAgent}
-                  disabled={!scheduleButtonEnabled || agentLoading}
-                  className="flex min-h-[50px] items-center justify-center gap-2 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-5 text-sm font-bold text-[var(--volt-yellow)] transition-all hover:bg-[var(--volt-yellow)] hover:text-black disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
-                >
-                  <CalendarClock size={18} />
-                  Schedule
-                </button>
               </form>
-
-              {scheduleComposerOpen ? (
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row max-w-md bg-black/30 p-2 rounded-xl border border-[var(--volt-yellow-border)]/50 backdrop-blur-sm">
-                  <input
-                    value={scheduleTime}
-                    onChange={(event) => {
-                      setScheduleTime(event.target.value);
-                      setAgentError("");
-                    }}
-                    placeholder="e.g. in 10 secs, or at 11:55 AM"
-                    className="min-h-[44px] flex-1 rounded-lg bg-transparent px-3 py-2 text-sm font-semibold text-[var(--volt-yellow)] outline-none placeholder:text-[var(--volt-yellow)]/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={scheduleAgent}
-                    disabled={agentLoading || !scheduleTime.trim()}
-                    className="min-h-[44px] rounded-lg bg-[var(--volt-yellow)] px-5 text-sm font-bold text-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Confirm Time
-                  </button>
-                </div>
-              ) : null}
 
 
             </div>
@@ -892,122 +649,68 @@ export default function SmartControl() {
           </div>
         </div>
 
-        {(agentChoice || agentError || (hideScheduleLoadingPanel ? agentResult.isDone : agentLoading || agentEvents.length > 0)) && createPortal((
+        {(agentError || agentLoading || agentEvents.length > 0) && createPortal((
           <div 
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200"
           >
             <div className="w-full max-w-md rounded-2xl border border-[var(--volt-yellow-border)] bg-[#1a1810]/95 p-5 shadow-[0_16px_48px_-12px_rgba(234,179,8,0.3)] relative animate-in zoom-in-95 duration-200">
-               {agentChoice ? (
-                  <div>
-                    <p className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--volt-yellow)] text-black font-extrabold">?</span> 
-                      Which {agentChoice.type} should I {agentChoice.action === "OFF" ? "turn off" : "turn on"}
-                      {agentChoice.timingText ? ` ${agentChoice.timingText}` : ""}?
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {agentChoice.devices.map((device) => {
-                        const ChoiceIcon = getTypeConfig(getDeviceType(device)).icon;
-                        return (
-                          <button
-                            key={device.id}
-                            type="button"
-                            onClick={() => runAgentForDevice(device)}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-[var(--volt-yellow-border)] bg-black/40 px-3 py-2 text-left transition-all hover:bg-[var(--volt-yellow)] hover:text-black hover:scale-[1.02]"
-                          >
-                            <span className="flex min-w-0 items-center gap-3">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/30">
-                                <ChoiceIcon size={16} />
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block truncate text-sm font-bold">{canonicalizeDeviceName(device)}</span>
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4">
-                    {(() => {
-                      const hasError = !!agentError || !!agentResult.isError;
-                      const showAsDone = agentResult.isDone && !hasError;
-                      
-                      const IconComp = hasError 
-                        ? XCircle 
-                        : getTypeConfig(agentResult.deviceType ?? agentTargetType ?? "device").icon;
+              <div className="flex items-center gap-4">
+                {(() => {
+                  const hasError = !!agentError || !!agentResult.isError;
+                  const showAsDone = agentResult.isDone && !hasError;
+                  
+                  const IconComp = hasError 
+                    ? XCircle 
+                    : getTypeConfig(agentResult.deviceType || "device").icon;
 
-                      let finalText = agentResult.answerText;
-                      const actualAction = (getAgentAction(agentSubmittedMessage || agentMessage) || agentIntent || "on").toLowerCase();
-                      
-                      if (hasError) {
-                        finalText = agentError || agentResult.errorMessage || `Failed to turn ${actualAction} device.`;
-                      } else if (showAsDone) {
-                        if (agentResult.action === "SCHEDULE") {
-                          const userTimeText = getRequestedScheduleTimeText(agentSubmittedMessage);
-                          finalText = userTimeText
-                            ? `${agentTargetName} scheduled to turn ${actualAction} ${userTimeText}.`
-                            : `${agentTargetName} scheduled to turn ${actualAction}.`;
-                        } else {
-                          if (agentResult.answerText) {
-                            finalText = agentResult.answerText;
-                          } else if (agentResult.errorMessage) {
-                            finalText = agentResult.errorMessage;
-                          } else {
-                            finalText = `${agentTargetName} turned ${actualAction} successfully.`;
-                            const suffix = totalPower >= 1000 ? " Watch out devices!" : "";
-                            finalText += suffix;
-                          }
-                        }
-                      }
+                  let finalText = agentResult.answerText;
+                  
+                  if (hasError) {
+                    finalText = agentError || agentResult.errorMessage || "Failed to execute request.";
+                  } else if (showAsDone) {
+                    finalText = agentResult.answerText || `${agentResult.finalDeviceName || "Device"} command successful.`;
+                  }
 
-                      return (
-                        <>
-                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                            showAsDone ? 'bg-[var(--volt-yellow)] text-black shadow-md' :
-                            hasError ? 'bg-red-500/10 text-red-500' :
-                            'bg-zinc-800 text-[var(--volt-yellow)]'
-                          }`}>
-                            <IconComp 
-                              size={24} 
-                              className={(!showAsDone && !hasError) ? "animate-spin" : ""} 
-                              style={(!showAsDone && !hasError) ? { animationDuration: "2s" } : {}} 
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0 pr-2">
-                            {showAsDone || hasError ? (
-                              <p className={`text-sm font-bold leading-tight ${hasError ? 'text-red-400' : 'text-white'}`}>
-                                {finalText}
-                              </p>
-                            ) : (
-                              <p className="text-sm font-semibold text-[var(--volt-yellow)] opacity-90 tracking-wide animate-pulse">
-                                {(() => {
-                                  const actionText = agentIntent === "SCHEDULE" 
-                                    ? `Scheduling to turn ${actualAction}` 
-                                    : actualAction === "off" 
-                                      ? "Turning off" 
-                                      : actualAction === "on"
-                                        ? "Turning on"
-                                        : "Updating";
-                                  return `${actionText} ${agentTargetName || "device"}...`;
-                                })()}
-                              </p>
-                            )}
-                          </div>
-                          {(showAsDone || hasError) ? (
-                            <button
-                              type="button"
-                              onClick={clearAgentResult}
-                              className={`shrink-0 rounded-lg px-5 py-2 text-xs font-bold text-black transition-all hover:brightness-110 hover:shadow-lg ${agentResult.action === "SCHEDULE" ? "bg-amber-500" : "bg-[var(--volt-yellow)]"}`}
-                            >
-                              OK
-                            </button>
-                          ) : null}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                  return (
+                    <>
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+                        showAsDone ? 'bg-[var(--volt-yellow)] text-black shadow-md' :
+                        hasError ? 'bg-red-500/10 text-red-500' :
+                        'bg-zinc-800 text-[var(--volt-yellow)]'
+                      }`}>
+                        <IconComp 
+                          size={24} 
+                          className={(!showAsDone && !hasError) ? "animate-spin" : ""} 
+                          style={(!showAsDone && !hasError) ? { animationDuration: "2s" } : {}} 
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0 pr-2">
+                        {showAsDone || hasError ? (
+                          <p className={`text-sm font-bold leading-tight ${hasError ? 'text-red-400' : 'text-white'}`}>
+                            {finalText}
+                          </p>
+                        ) : (
+                          <p className="text-sm font-semibold text-[var(--volt-yellow)] opacity-90 tracking-wide animate-pulse">
+                            {agentResult.loadingDeviceName === "device" ? "Analyzing request..." : `Connecting to ${agentResult.loadingDeviceName}...`}
+                          </p>
+                        )}
+                      </div>
+                      {(showAsDone || hasError) ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAgentEvents([]);
+                            setAgentError("");
+                          }}
+                          className={`shrink-0 rounded-lg px-5 py-2 text-xs font-bold text-black transition-all hover:brightness-110 hover:shadow-lg bg-[var(--volt-yellow)]`}
+                        >
+                          OK
+                        </button>
+                      ) : null}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         ), document.body)}

@@ -82,41 +82,17 @@ function MessageBody({ text }) {
   );
 }
 
-// One toggle controls the active assistant mode while reusing the same page layout underneath.
-function ModeSwitch({ compact = false }) {
-  const { activeMode, setActiveMode, modeConfig } = useAssistant();
-
-  return (
-    <div className={`inline-flex rounded-2xl border border-zinc-800 bg-zinc-900 p-1 ${compact ? "w-full" : ""}`}>
-      {[assistantModes.chat, assistantModes.qa].map((mode) => (
-        <button
-          key={mode}
-          type="button"
-          onClick={() => setActiveMode(mode)}
-          className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
-            activeMode === mode
-              ? "bg-[var(--volt-yellow)] text-black"
-              : "text-zinc-400 hover:text-[var(--volt-yellow)]"
-          } ${compact ? "flex-1" : ""}`}
-        >
-          {modeConfig[mode].label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export default function AssistantSurface({
   compact = false,
   showSidebar = true,
   showHeader = true,
-  showModeSwitch = true,
   showPanelHeader = true,
   showCompactFooter = true,
   fixedMode = null,
   className = "",
 }) {
-  const { activeMode, modeConfig, modeState, setError, askQuestion, stopQuestion, getChatMemory, messageRefs, scrollToMessage } =
+  const { activeMode, modeConfig, modeState, setError, askQuestion, stopQuestion, getChatMemory, messageRefs, scrollToMessage, loadSession, startNewSession } =
     useAssistant();
   const [question, setQuestion] = useState("");
   const messagesEndRef = useRef(null);
@@ -180,11 +156,8 @@ export default function AssistantSurface({
               <h1 className="text-2xl font-bold text-white">{config.title}</h1>
               <p className="max-w-3xl text-base font-medium text-zinc-400">{config.subtitle}</p>
             </div>
-            {showModeSwitch ? <ModeSwitch /> : null}
           </div>
         </div>
-      ) : showModeSwitch ? (
-        <ModeSwitch compact />
       ) : null}
 
       <section className={shellClasses}>
@@ -224,7 +197,7 @@ export default function AssistantSurface({
                     }`}
                   >
                     <MessageBody text={message.text} />
-                    {effectiveMode === assistantModes.qa && message.role === "assistant" && message.sources?.length ? (
+                    {message.role === "assistant" && message.sources?.length ? (
                       <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--volt-yellow)]">
                         Based on the VoltStream guide
                       </p>
@@ -308,17 +281,26 @@ export default function AssistantSurface({
               </div>
             </div>
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <Brain className="text-[var(--volt-yellow)]" size={22} />
-                <h3 className="font-display text-lg font-semibold text-[var(--volt-yellow)]">Chat Memory</h3>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Brain className="text-[var(--volt-yellow)]" size={22} />
+                  <h3 className="font-display text-lg font-semibold text-[var(--volt-yellow)]">Chat Sessions</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startNewSession(effectiveMode)}
+                  className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--volt-yellow)] transition-colors hover:text-white"
+                >
+                  + New
+                </button>
               </div>
               {chatMemory.length > 0 ? (
-                <div className="max-h-48 space-y-3 overflow-y-auto pr-1">
+                <div className="max-h-64 space-y-3 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                   {chatMemory.map((item) => (
                     <button
-                      key={`${effectiveMode}-${item.topic}`}
+                      key={`${effectiveMode}-${item.sessionId}`}
                       type="button"
-                      onClick={() => scrollToMessage(item.messageIndex, effectiveMode)}
+                      onClick={() => loadSession(item.sessionId, effectiveMode)}
                       className="w-full rounded-2xl border border-zinc-800 bg-black/30 px-4 py-3 text-left transition-colors hover:border-[var(--volt-yellow-border)] hover:text-[var(--volt-yellow)]"
                     >
                       <p className="text-sm font-semibold leading-6 text-zinc-300">{item.topic}</p>

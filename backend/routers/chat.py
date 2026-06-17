@@ -3,6 +3,7 @@ from fastapi import APIRouter, Body
 from schemas.chat import ChatRequest, ChatResponse
 from services.chat_service import answer_chat
 from services.rag_service import answer_qa
+from services.session_service import save_message
 
 router = APIRouter()
 
@@ -38,7 +39,15 @@ async def chat(
         examples=[{"question": "How does solar reduce my bill?"}],
     )
 ):
-    return answer_chat(request)
+    if request.session_id:
+        await save_message(request.session_id, request.mode, "user", request.question)
+        
+    response = answer_chat(request)
+    
+    if request.session_id:
+        await save_message(request.session_id, request.mode, "assistant", response.answer, response.sources)
+        
+    return response
 
 
 @router.post(
@@ -52,4 +61,12 @@ async def qa(
         examples=[{"question": "Explain the dashboard in simple terms."}],
     )
 ):
-    return await answer_qa(request)
+    if request.session_id:
+        await save_message(request.session_id, request.mode, "user", request.question)
+        
+    response = await answer_qa(request)
+    
+    if request.session_id:
+        await save_message(request.session_id, request.mode, "assistant", response.answer, response.sources)
+        
+    return response

@@ -40,7 +40,10 @@ def _sse(event_type: str, data: dict) -> str:
 # Main entry point that runs the Orchestrator Agent and streams events to the UI
 async def stream_orchestrator_agent(message: str, session_id: str | None = None):
     if not session_id:
-        session_id = f"session-{uuid4().hex}"
+        session_id = str(uuid4())
+        
+    from services.session_service import save_message
+    await save_message(session_id, "qa", "user", message)
         
     try:
         # In memory sessions are lost on restart, so we always try to create it if we need to.
@@ -133,6 +136,7 @@ async def stream_orchestrator_agent(message: str, session_id: str | None = None)
                 text = "".join(p.text for p in parts if getattr(p, "text", None)).strip() if parts else ""
                 if text:
                     yield _sse("answer", {"answer": text})
+                    await save_message(session_id, "qa", "assistant", text)
 
         if judge_task:
             judge_result = await judge_task

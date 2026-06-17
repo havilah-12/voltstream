@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=2, description="User question about energy, solar, billing, or VoltStream")
+    session_id: str | None = Field(None, description="Optional session ID for memory")
+    mode: str = Field("chat", description="Mode of the chat (chat or qa)")
 
     model_config = {
         "json_schema_extra": {

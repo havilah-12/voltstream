@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from database.db import initialize_database
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from routers import device_agent, analytics, billing, chat, dashboard, devices, orchestrator_agent
+from routers import device_agent, analytics, billing, chat, dashboard, devices, orchestrator_agent, chat_sessions
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -70,6 +70,7 @@ def register_routes(api: FastAPI) -> None:
     api.include_router(chat.router, prefix="/api/v1/aibot")
     api.include_router(device_agent.router, prefix="/api/v1/agent")
     api.include_router(orchestrator_agent.router, prefix="/api/v1/multi_agent")
+    api.include_router(chat_sessions.router, prefix="/api/v1/chat-sessions")
 
 
 @app.get("/", include_in_schema=False)

@@ -1,10 +1,9 @@
-import { createContext, useContext, useMemo, useRef, useState } from "react";
-import { askChatBot, askQaBot } from "../../api/chatApi";
-import { assistantModes, getMemoryLabel, modeConfig } from "./assistantConstants";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { askQaBot, fetchSessions, fetchSessionMessages } from "../../api/chatApi";
+import { assistantModes, modeConfig } from "./assistantConstants";
 
 const AssistantContext = createContext(null);
 
-// Each bot mode keeps its own messages, loading state, and error state so toggling does not wipe the other side.
 function buildInitialModeState() {
   return Object.fromEntries(
     Object.entries(modeConfig).map(([mode, config]) => [
@@ -13,36 +12,86 @@ function buildInitialModeState() {
         messages: [...config.initialMessages],
         loading: false,
         error: "",
+        sessions: [],
+        activeSessionId: null,
       },
     ]),
   );
 }
 
 export function AssistantProvider({ children }) {
-  const [activeMode, setActiveMode] = useState(assistantModes.chat);
+  const [activeMode, setActiveMode] = useState(assistantModes.unified);
   const [modeState, setModeState] = useState(buildInitialModeState);
   const messageRefs = useRef({
-    [assistantModes.chat]: {},
-    [assistantModes.qa]: {},
+    [assistantModes.unified]: {},
   });
-  // Abort controllers let each mode stop its own in-flight response independently.
   const abortControllers = useRef({
-    [assistantModes.chat]: null,
-    [assistantModes.qa]: null,
+    [assistantModes.unified]: null,
   });
 
-  // Chat Memory is derived from earlier user prompts rather than stored separately in the backend.
-  const buildChatMemory = (mode) => {
-    const topicMap = new Map();
-    modeState[mode].messages.forEach((message, index) => {
-      if (message.role !== "user") return;
-      topicMap.set(getMemoryLabel(message.text, mode), index);
-    });
-    return Array.from(topicMap, ([topic, messageIndex]) => ({ topic, messageIndex })).slice(-4);
+  // Fetch sessions on mount
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const unifiedSessions = await fetchSessions(assistantModes.unified);
+        
+        setModeState((current) => ({
+          ...current,
+          [assistantModes.unified]: { ...current[assistantModes.unified], sessions: unifiedSessions }
+        }));
+      } catch (err) {
+        console.error("Failed to load sessions", err);
+      }
+    }
+    loadSessions();
+  }, []);
+
+  const loadSession = async (sessionId, modeOverride = activeMode) => {
+    try {
+      setModeState(current => ({
+        ...current,
+        [modeOverride]: { ...current[modeOverride], loading: true, error: "" }
+      }));
+      const sessionData = await fetchSessionMessages(sessionId);
+      
+      setModeState(current => ({
+        ...current,
+        [modeOverride]: {
+          ...current[modeOverride],
+          messages: [...modeConfig[modeOverride].initialMessages, ...(sessionData.messages || [])],
+          activeSessionId: sessionId,
+          loading: false
+        }
+      }));
+    } catch (err) {
+      console.error(err);
+      setError("Could not load that chat session.", modeOverride);
+    }
+  };
+
+  const startNewSession = (modeOverride = activeMode) => {
+    setModeState(current => ({
+      ...current,
+      [modeOverride]: {
+        ...current[modeOverride],
+        messages: [...modeConfig[modeOverride].initialMessages],
+        activeSessionId: null,
+        error: "",
+        loading: false
+      }
+    }));
   };
 
   const currentState = modeState[activeMode];
-  const chatMemory = useMemo(() => buildChatMemory(activeMode), [activeMode, modeState]);
+  
+  // Replace buildChatMemory with actual sessions
+  const getChatMemory = (mode) => {
+    return modeState[mode].sessions.map(s => ({
+      topic: s.topic_label || "Chat Session",
+      sessionId: s.session_id
+    }));
+  };
+  const chatMemory = useMemo(() => getChatMemory(activeMode), [activeMode, modeState]);
 
   const setError = (nextError, modeOverride = activeMode) => {
     setModeState((current) => ({
@@ -54,123 +103,94 @@ export function AssistantProvider({ children }) {
     }));
   };
 
-  const getFriendlyAssistantError = (modeOverride, err) => {
-    const loweredMessage = String(err?.message ?? "").toLowerCase();
-    const botLabel = modeConfig[modeOverride].label;
-
-    if (loweredMessage.includes("timeout")) {
-      return {
-        bubble: `${botLabel} is taking a little longer than usual. Please try again in a moment.`,
-        banner: `${botLabel} is taking longer than expected right now.`,
-      };
-    }
-
-    if (loweredMessage.includes("network") || loweredMessage.includes("failed")) {
-      return {
-        bubble: `I could not reach the ${botLabel} right now. Please try again in a moment.`,
-        banner: `${botLabel} is temporarily unavailable.`,
-      };
-    }
-
-    return {
-      bubble: `I could not complete that response right now. Please try again in a moment.`,
-      banner: `${botLabel} is temporarily unavailable.`,
-    };
-  };
-
   const askQuestion = async (rawQuestion, files = [], modeOverride = activeMode, options = {}) => {
     const trimmedQuestion = rawQuestion.trim();
     if (!trimmedQuestion || modeState[modeOverride].loading) return;
-    const { replaceFromIndex = null } = options;
+
+    let currentSessionId = modeState[modeOverride].activeSessionId;
+    let isNewSession = false;
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID();
+      isNewSession = true;
+    }
 
     const attachmentNames = files.map((file) => file.name);
     const controller = new AbortController();
     abortControllers.current[modeOverride] = controller;
 
-    setModeState((current) => {
-      const baseMessages =
-        replaceFromIndex === null ? current[modeOverride].messages : current[modeOverride].messages.slice(0, replaceFromIndex);
-
-      return {
-        ...current,
-        [modeOverride]: {
-          ...current[modeOverride],
-          error: "",
-          loading: true,
-          messages: [
-            ...baseMessages,
-            {
-              role: "user",
-              text: trimmedQuestion,
-              sources: [],
-              attachments: attachmentNames,
-              uploadedFiles: files,
-            },
-          ],
-        },
-      };
-    });
+    setModeState((current) => ({
+      ...current,
+      [modeOverride]: {
+        ...current[modeOverride],
+        error: "",
+        loading: true,
+        activeSessionId: currentSessionId,
+        messages: [
+          ...current[modeOverride].messages,
+          {
+            role: "user",
+            text: trimmedQuestion,
+            sources: [],
+            attachments: attachmentNames,
+            uploadedFiles: files,
+          },
+        ],
+      },
+    }));
 
     try {
-      // The mode switch decides whether the shared UI calls the general chat endpoint or the grounded QA endpoint.
-      const requestFn = modeOverride === assistantModes.qa ? askQaBot : askChatBot;
-      const response = await requestFn(trimmedQuestion, files, controller.signal);
-      setModeState((current) => ({
-        ...current,
-        [modeOverride]: {
-          ...current[modeOverride],
-          loading: false,
-          messages: [
-            ...current[modeOverride].messages,
-            {
-              role: "assistant",
-              text: response.answer,
-              sources: response.sources ?? [],
-              attachments: [],
-              usedGemini: response.used_gemini,
-            },
-          ],
-        },
-      }));
-    } catch (err) {
-      if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.name === "AbortError") {
-        setModeState((current) => ({
+      const response = await askQaBot(trimmedQuestion, files, controller.signal, {
+        sessionId: currentSessionId
+      });
+      
+      setModeState((current) => {
+        const nextState = {
           ...current,
           [modeOverride]: {
             ...current[modeOverride],
             loading: false,
-            error: "",
             messages: [
               ...current[modeOverride].messages,
               {
                 role: "assistant",
-                text: "Okay, I stopped that response.",
-                sources: [],
+                text: response.answer,
+                sources: response.sources ?? [],
                 attachments: [],
+                usedGemini: response.used_gemini,
               },
             ],
           },
+        };
+        
+        // Optimistically add to sessions list if it's new
+        if (isNewSession) {
+          nextState[modeOverride].sessions = [
+            { session_id: currentSessionId, topic_label: "New Chat", mode: modeOverride },
+            ...nextState[modeOverride].sessions
+          ];
+        }
+        return nextState;
+      });
+      
+      // Async refresh sessions to get the true LLM-generated title
+      if (isNewSession) {
+        fetchSessions(modeOverride).then(sessions => {
+          setModeState(curr => ({
+            ...curr,
+            [modeOverride]: { ...curr[modeOverride], sessions }
+          }));
+        }).catch(e => console.error(e));
+      }
+
+    } catch (err) {
+      if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.name === "AbortError") {
+        setModeState((current) => ({
+          ...current,
+          [modeOverride]: { ...current[modeOverride], loading: false },
         }));
         return;
       }
-      const friendlyError = getFriendlyAssistantError(modeOverride, err);
-      setModeState((current) => ({
-        ...current,
-        [modeOverride]: {
-          ...current[modeOverride],
-          loading: false,
-          error: friendlyError.banner,
-          messages: [
-            ...current[modeOverride].messages,
-            {
-              role: "assistant",
-              text: friendlyError.bubble,
-              sources: [],
-              attachments: [],
-            },
-          ],
-        },
-      }));
+      setError("An error occurred.", modeOverride);
     } finally {
       abortControllers.current[modeOverride] = null;
     }
@@ -181,30 +201,21 @@ export function AssistantProvider({ children }) {
   };
 
   const scrollToMessage = (messageIndex, modeOverride = activeMode) => {
-    messageRefs.current[modeOverride]?.[messageIndex]?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+    messageRefs.current[modeOverride]?.[messageIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const value = useMemo(
     () => ({
-      activeMode,
-      setActiveMode,
-      modeConfig,
+      activeMode, setActiveMode, modeConfig, 
       messages: currentState.messages,
-      loading: currentState.loading,
-      error: currentState.error,
-      setError,
-      askQuestion,
-      stopQuestion,
-      chatMemory,
-      getChatMemory: buildChatMemory,
-      modeState,
-      messageRefs,
-      scrollToMessage,
+      loading: currentState.loading, error: currentState.error,
+      sessions: currentState.sessions, activeSessionId: currentState.activeSessionId,
+      setError, askQuestion, stopQuestion,
+      chatMemory, getChatMemory,
+      modeState, messageRefs, scrollToMessage,
+      loadSession, startNewSession
     }),
-    [activeMode, currentState, chatMemory, modeState],
+    [activeMode, currentState, chatMemory, modeState]
   );
 
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;
