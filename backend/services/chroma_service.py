@@ -91,6 +91,7 @@ def _get_collection():
         collection = client.get_or_create_collection(
             name=settings.chroma_collection_name,
             metadata={"source": "voltstream_energy_guide"},
+            embedding_function=embedding_function,
         )
         if collection.count() > 0:
             logger.info("Loaded existing Chroma collection with %s chunks.", collection.count())

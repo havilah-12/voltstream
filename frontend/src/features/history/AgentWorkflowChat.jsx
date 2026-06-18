@@ -71,7 +71,9 @@ export default function AgentWorkflowChat({ open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [activeTools, setActiveTools] = useState([]);
   const [sessionId, setSessionId] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   
+
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
   const agentCacheRef = useRef({});
@@ -85,6 +87,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
       abortControllerRef.current?.abort();
       setLoading(false);
       setActiveTools([]);
+      setIsGenerating(false);
     }
   }, [open]);
 
@@ -108,6 +111,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
 
     setLoading(true);
     setActiveTools([]);
+    setIsGenerating(false);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -144,6 +148,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
               return updated;
             });
           } else if (parsed.event === "answer_chunk") {
+            setIsGenerating(true);
             finalAnswer += parsed.data.chunk;
             setMessages((prev) => {
               const msgExists = prev.some(m => m.id === assistantMsgId);
@@ -191,6 +196,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
     } finally {
       setLoading(false);
       setActiveTools([]);
+      setIsGenerating(false);
     }
   };
 
@@ -326,7 +332,7 @@ export default function AgentWorkflowChat({ open, onClose }) {
           })}
 
           {/* Generic Thinking Loader */}
-          {loading && activeTools.length === 0 && (
+          {loading && activeTools.length === 0 && !isGenerating && (
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-2xl px-5 py-4 border border-[var(--volt-yellow-border)] bg-[var(--volt-yellow-soft)] rounded-tl-sm flex items-center gap-3 shadow-sm">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-[var(--volt-yellow)]">
