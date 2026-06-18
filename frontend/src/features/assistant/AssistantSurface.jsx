@@ -82,11 +82,33 @@ function MessageBody({ text }) {
   );
 }
 
+function ModeSwitch({ compact = false }) {
+  const { activeMode, setActiveMode, modeConfig } = useAssistant();
+  return (
+    <div className={`flex rounded-2xl bg-zinc-900/50 p-1 ${compact ? "w-full" : ""}`}>
+      {Object.values(assistantModes).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => setActiveMode(mode)}
+          className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+            activeMode === mode
+              ? "bg-[var(--volt-yellow)] text-black"
+              : "text-zinc-400 hover:text-[var(--volt-yellow)]"
+          } ${compact ? "flex-1" : ""}`}
+        >
+          {modeConfig[mode].toggleLabel || modeConfig[mode].label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function AssistantSurface({
   compact = false,
   showSidebar = true,
   showHeader = true,
+  showModeSwitch = true,
   showPanelHeader = true,
   showCompactFooter = true,
   fixedMode = null,
@@ -143,9 +165,6 @@ export default function AssistantSurface({
   const askButtonClasses = compact
     ? "flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--volt-yellow)] px-4 text-sm font-bold text-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
     : "flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--volt-yellow)] px-5 font-bold text-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50";
-  const stopButtonClasses = compact
-    ? "flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-4 text-sm font-bold text-zinc-200 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
-    : "flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-5 font-bold text-zinc-200 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300";
 
   return (
     <div className={rootClasses}>
@@ -156,8 +175,11 @@ export default function AssistantSurface({
               <h1 className="text-2xl font-bold text-white">{config.title}</h1>
               <p className="max-w-3xl text-base font-medium text-zinc-400">{config.subtitle}</p>
             </div>
+            {showModeSwitch ? <ModeSwitch /> : null}
           </div>
         </div>
+      ) : showModeSwitch ? (
+        <ModeSwitch compact />
       ) : null}
 
       <section className={shellClasses}>

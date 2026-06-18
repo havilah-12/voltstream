@@ -34,6 +34,8 @@ import {
   canonicalizeDeviceType,
   getDeviceLabel,
   getDeviceType,
+  getMentionedDeviceType,
+  messageSpecifiesDevice,
   getPreferredSelections,
   getSavingStatus,
   getTypeConfig,
@@ -41,7 +43,14 @@ import {
   withHouseholdDefaults,
 } from "../features/devices/deviceUtils";
 
-import { getAgentResult, parseScheduledFor } from "../features/devices/agentUtils";
+import {
+  getAgentResult,
+  parseScheduledFor,
+  getAgentAction,
+  getTimingPhrase,
+  canScheduleAgentMessage,
+  getRequestedScheduleTimeText,
+} from "../features/devices/agentUtils";
 
 export default function SmartControl() {
   const [devices, setDevices] = useState([]);
@@ -293,6 +302,59 @@ export default function SmartControl() {
   const runAgent = async (event) => {
     event.preventDefault();
     const trimmedMessage = agentMessage.trim();
+    if (!trimmedMessage) return;
+
+    const action = getAgentAction(trimmedMessage);
+    const mentionedType = getMentionedDeviceType(trimmedMessage);
+    const timingPhrase = getTimingPhrase(trimmedMessage);
+
+    const devicesForType = mentionedType
+      ? devices.filter((device) => getDeviceType(device) === mentionedType)
+      : [];
+
+    let targetDevice = null;
+    if (devicesForType.length === 1 && !messageSpecifiesDevice(trimmedMessage, devicesForType)) {
+      targetDevice = devicesForType[0];
+    } else if (devicesForType.length > 0) {
+      const specifiedDevices = devicesForType.filter((d) => messageSpecifiesDevice(trimmedMessage, [d]));
+      if (specifiedDevices.length === 1) {
+        targetDevice = specifiedDevices[0];
+      }
+    }
+
+    if (action && !timingPhrase) {
+      if (devicesForType.length > 1 && !targetDevice) {
+        // Multiple devices found, need clarification
+        const names = devicesForType.map(d => d.name).join(", ");
+        setAgentEvents([{ event: "answer", data: { answer: `Which ${mentionedType.toLowerCase()} would you like to turn ${action}? Options: ${names}` } }]);
+        setAgentMessage("");
+        return;
+      }
+
+      if (targetDevice) {
+        if (targetDevice.status === action) {
+          notify({
+            type: "success",
+            title: "Action Completed",
+            message: `${targetDevice.name} is already ${action}.`,
+            silent: true,
+          });
+          setAgentMessage("");
+          return;
+        }
+
+        await toggleDevice(targetDevice.id, targetDevice.status);
+        notify({
+          type: "success",
+          title: "Action Completed",
+          message: `${targetDevice.name} turned ${action} successfully.`,
+          silent: true,
+        });
+        setAgentMessage("");
+        return;
+      }
+    }
+
     await executeAgentMessage(trimmedMessage);
   };
 

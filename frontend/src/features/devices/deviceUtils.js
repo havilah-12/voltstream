@@ -1,5 +1,5 @@
 import { Power } from "lucide-react";
-import { deviceTypeConfig, householdDefaults } from "./deviceConstants";
+import { deviceTypeConfig, householdDefaults, DEVICE_TYPE_ALIASES } from "./deviceConstants";
 
 export function normalizeTypeKey(value) {
   return String(value ?? "")
@@ -11,6 +11,12 @@ export function normalizeTypeKey(value) {
 
 export const canonicalizeDeviceType = (type) => {
   if (!type) return type;
+  const normalized = normalizeTypeKey(type);
+  for (const [aliases, canonical] of DEVICE_TYPE_ALIASES.entries()) {
+    if (aliases.includes(normalized)) {
+      return canonical;
+    }
+  }
   return type
     .trim()
     .split(/\s+/)
@@ -66,5 +72,34 @@ export function getSavingStatus(device, typeIndex) {
   if (["fridge", "laptop", "charger"].includes(type)) return "ON";
   if (["ac", "cooler", "heater", "water heater", "washing machine", "microwave", "cooker", "tv"].includes(type)) return "OFF";
   return Number(device.power_usage_w) <= 75 ? "ON" : "OFF";
+}
+
+export function getMentionedDeviceType(message) {
+  const normalized = normalizeTypeKey(message);
+  for (const [aliases, canonical] of DEVICE_TYPE_ALIASES.entries()) {
+    if (aliases.some((alias) => new RegExp(`\\b${alias.replace(/\s+/g, "\\s+")}\\b`).test(normalized))) {
+      return canonical;
+    }
+  }
+  return null;
+}
+
+export function messageSpecifiesDevice(message, devicesForType) {
+  const normalized = normalizeTypeKey(message);
+  return devicesForType.some((device) => {
+    const typeOnly = normalizeTypeKey(getDeviceType(device));
+    const specificValues = [
+      device.id,
+      device.name,
+      `${device.name} ${device.location ?? ""}`,
+      `${getDeviceType(device)} ${device.location ?? ""}`,
+      `${device.location ?? ""} ${device.name}`,
+      `${device.location ?? ""} ${getDeviceType(device)}`,
+    ];
+    return specificValues.some((value) => {
+      const normalizedValue = normalizeTypeKey(value);
+      return normalizedValue && normalizedValue !== typeOnly && normalized.includes(normalizedValue);
+    });
+  });
 }
 

@@ -14,6 +14,23 @@ import {
   Wind,
 } from "lucide-react";
 
+export const DEVICE_TYPE_ALIASES = new Map([
+  [["ac", "aircon", "air conditioner"], "AC"],
+  [["tv", "television"], "TV"],
+  [["fridge", "refrigerator"], "Fridge"],
+  [["fan", "ceiling fan", "table fan"], "Fan"],
+  [["cooler", "air cooler"], "Cooler"],
+  [["heater", "room heater"], "Heater"],
+  [["water heater", "geyser", "boiler"], "Water Heater"],
+  [["washing machine", "washer"], "Washing Machine"],
+  [["tube light", "tubelight", "light"], "Tube Light"],
+  [["bulb", "lamp"], "Bulb"],
+  [["laptop", "computer", "pc", "laptop charger"], "Laptop"],
+  [["charger", "phone charger", "adapter"], "Charger"],
+  [["microwave", "oven"], "Microwave"],
+  [["cooker", "electric cooker", "rice cooker"], "Cooker"],
+]);
+
 
 export const householdDefaults = [
   { id: "cooler-1", type: "Cooler", name: "Cooler 1", location: "Living Room", status: "OFF", power_usage_w: 220 },

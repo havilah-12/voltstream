@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { askQaBot, fetchSessions, fetchSessionMessages } from "../../api/chatApi";
+import { askChatBot, askQaBot, fetchSessions, fetchSessionMessages } from "../../api/chatApi";
 import { assistantModes, modeConfig } from "./assistantConstants";
 
 const AssistantContext = createContext(null);
@@ -20,24 +20,30 @@ function buildInitialModeState() {
 }
 
 export function AssistantProvider({ children }) {
-  const [activeMode, setActiveMode] = useState(assistantModes.unified);
+  const [activeMode, setActiveMode] = useState(assistantModes.rag);
   const [modeState, setModeState] = useState(buildInitialModeState);
   const messageRefs = useRef({
-    [assistantModes.unified]: {},
+    [assistantModes.normal]: {},
+    [assistantModes.rag]: {},
   });
   const abortControllers = useRef({
-    [assistantModes.unified]: null,
+    [assistantModes.normal]: null,
+    [assistantModes.rag]: null,
   });
 
   // Fetch sessions on mount
   useEffect(() => {
     async function loadSessions() {
       try {
-        const unifiedSessions = await fetchSessions(assistantModes.unified);
+        const [normalSessions, ragSessions] = await Promise.all([
+          fetchSessions(assistantModes.normal),
+          fetchSessions(assistantModes.rag),
+        ]);
         
         setModeState((current) => ({
           ...current,
-          [assistantModes.unified]: { ...current[assistantModes.unified], sessions: unifiedSessions }
+          [assistantModes.normal]: { ...current[assistantModes.normal], sessions: normalSessions },
+          [assistantModes.rag]: { ...current[assistantModes.rag], sessions: ragSessions },
         }));
       } catch (err) {
         console.error("Failed to load sessions", err);
@@ -139,9 +145,9 @@ export function AssistantProvider({ children }) {
     }));
 
     try {
-      const response = await askQaBot(trimmedQuestion, files, controller.signal, {
-        sessionId: currentSessionId
-      });
+      const response = modeOverride === assistantModes.normal
+        ? await askChatBot(trimmedQuestion, controller.signal, { sessionId: currentSessionId })
+        : await askQaBot(trimmedQuestion, files, controller.signal, { sessionId: currentSessionId });
       
       setModeState((current) => {
         const nextState = {
@@ -204,19 +210,20 @@ export function AssistantProvider({ children }) {
     messageRefs.current[modeOverride]?.[messageIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const value = useMemo(
-    () => ({
-      activeMode, setActiveMode, modeConfig, 
-      messages: currentState.messages,
-      loading: currentState.loading, error: currentState.error,
-      sessions: currentState.sessions, activeSessionId: currentState.activeSessionId,
-      setError, askQuestion, stopQuestion,
-      chatMemory, getChatMemory,
-      modeState, messageRefs, scrollToMessage,
-      loadSession, startNewSession
-    }),
-    [activeMode, currentState, chatMemory, modeState]
-  );
+  const value = {
+    activeMode,
+    setActiveMode,
+    modeConfig,
+    modeState,
+    setError,
+    askQuestion,
+    stopQuestion,
+    getChatMemory,
+    messageRefs,
+    scrollToMessage,
+    loadSession,
+    startNewSession
+  };
 
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;
 }

@@ -3,6 +3,15 @@ import { apiRequest } from "./client";
 
 
 
+export async function askChatBot(question, signal, requestOptions = {}) {
+  return apiRequest("/aibot/chat", {
+    method: "post",
+    data: { question, session_id: requestOptions.sessionId },
+    signal,
+    timeout: 60000,
+  });
+}
+
 export async function askQaBot(question, files, signal, requestOptions = {}) {
   return apiRequest("/aibot/qa", {
     method: "post",
