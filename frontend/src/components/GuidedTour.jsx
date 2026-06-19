@@ -285,8 +285,6 @@ export default function GuidedTour() {
     if (!shouldShow || !step) return undefined;
 
     let frameId;
-    let timeoutId;
-    let dropdownTimeoutId;
     // Each step resolves a data-tour target from the page and redraws the highlight around it.
     const updateRect = () => {
       const target = document.querySelector(`[data-tour="${step.target}"]`);
@@ -309,16 +307,12 @@ export default function GuidedTour() {
     };
 
     updateRect();
-    timeoutId = window.setTimeout(updateRect, stepIndex === 0 ? 40 : 120);
-    if (step.openDropdown) {
-      dropdownTimeoutId = window.setTimeout(updateRect, 180);
-    }
+    const pollId = window.setInterval(updateRect, 200);
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
 
     return () => {
-      window.clearTimeout(timeoutId);
-      window.clearTimeout(dropdownTimeoutId);
+      window.clearInterval(pollId);
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
@@ -330,6 +324,11 @@ export default function GuidedTour() {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const isPageOverview = step.target === "page-overview" || stepIndex === 0;
+
+  if (!isPageOverview && !targetRect) {
+    return null;
+  }
+
   const highlight = isPageOverview
     ? {
         top: 8,
@@ -337,21 +336,14 @@ export default function GuidedTour() {
         width: viewportWidth - 16,
         height: viewportHeight - 16,
       }
-    : targetRect
-    ? (() => {
+    : (() => {
         const top = Math.max(8, targetRect.top - 8);
         const left = Math.max(8, targetRect.left - 8);
         const width = Math.min(viewportWidth - left - 8, targetRect.width + 16);
         const visibleBottom = Math.min(viewportHeight - 8, targetRect.bottom + 8);
         const height = Math.max(48, Math.min(targetRect.height + 16, visibleBottom - top));
         return { top, left, width, height };
-      })()
-    : {
-        top: 120,
-        left: 24,
-        width: Math.min(viewportWidth - 48, 520),
-        height: 160,
-      };
+      })();
   const overlayBlocks = [
     { top: 0, left: 0, width: viewportWidth, height: highlight.top },
     { top: highlight.top, left: 0, width: highlight.left, height: highlight.height },
